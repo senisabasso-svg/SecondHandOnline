@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Este archivo se utiliza para construir, probar y ejecutar el proyecto ProyectoMago -->
+<project name="ProyectoMago" default="default" basedir=".">
+    <description>Construye, prueba y ejecuta el proyecto ProyectoMago.</description>
+
+    <!-- Importa las configuraciones predeterminadas de NetBeans -->
+    <import file="nbproject/build-impl.xml"/>
+
+    <!-- 
+    Existen varios objetivos que por defecto están vacíos y pueden ser utilizados 
+    para ejecutar tareas antes o después de los objetivos principales. Estos objetivos son:
+
+      -pre-init:                  Se llama antes de la inicialización de las propiedades del proyecto.
+      -post-init:                 Se llama después de la inicialización de las propiedades del proyecto.
+      -pre-compile:               Se llama antes de la compilación con javac.
+      -post-compile:              Se llama después de la compilación con javac.
+      -pre-compile-single:        Se llama antes de compilar un solo archivo con javac.
+      -post-compile-single:       Se llama después de compilar un solo archivo con javac.
+      -pre-compile-test:          Se llama antes de compilar las pruebas JUnit.
+      -post-compile-test:         Se llama después de compilar las pruebas JUnit.
+      -pre-compile-test-single:   Se llama antes de compilar una sola prueba JUnit.
+      -post-compile-test-single:  Se llama después de compilar una sola prueba JUnit.
+      -pre-jar:                   Se llama antes de construir el archivo JAR.
+      -post-jar:                  Se llama después de construir el archivo JAR.
+      -post-clean:                Se llama después de limpiar los productos de construcción.
+
+    Por ejemplo, para insertar un obfuscador después de la compilación:
+
+        <target name="-post-compile">
+            <obfuscate>
+                <fileset dir="${build.classes.dir}"/>
+            </obfuscate>
+        </target>
+
+    También puedes sobrescribir los objetivos principales como:
+
+      -do-jar:                   Construcción del archivo JAR.
+      run:                       Ejecución del proyecto.
+      test-report:               Generación del reporte de pruebas JUnit.
+
+    Si deseas personalizar el comportamiento de la ejecución, puedes sobrescribir el objetivo `run`, por ejemplo:
+
+        <target name="run" depends="ProyectoMago-impl.jar">
+            <exec dir="bin" executable="launcher.exe">
+                <arg file="${dist.jar}"/>
+            </exec>
+        </target>
+    -->
+
+</project>

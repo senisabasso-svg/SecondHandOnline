@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SecondHand {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  usuarios    Usuario[]
+  proveedores Proveedor[]
+  productos   Producto[]
+  ventas      Venta[]
+  ventaItems  VentaItem[]
+  menuPrecios MenuPrecio[]
+
+  @@map("second_hands")
+}
+
+model Usuario {
+  id           Int     @id @default(autoincrement())
+  idSecond     Int?    @map("id_second")
+  email        String  @unique
+  passwordHash String  @map("password_hash")
+  nombre       String?
+  rol          String
+
+  secondHand SecondHand? @relation(fields: [idSecond], references: [id], onDelete: SetNull)
+
+  @@map("usuarios")
+}
+
+model Proveedor {
+  id        Int     @id @default(autoincrement())
+  idSecond  Int     @map("id_second")
+  nombre    String
+  telefono  String?
+  email     String?
+
+  secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
+  productos  Producto[]
+
+  @@index([idSecond])
+  @@map("proveedores")
+}
+
+model Producto {
+  id           Int     @id @default(autoincrement())
+  idSecond     Int     @map("id_second")
+  descripcion  String
+  tipoPrenda   String? @map("tipo_prenda")
+  marca        String?
+  color        String?
+  condicion    String?
+  precioVenta  Float   @map("precio_venta")
+  talle        String?
+  idProveedor  Int     @map("id_proveedor")
+  estado       String  @default("disponible")
+
+  secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
+  proveedor  Proveedor  @relation(fields: [idProveedor], references: [id])
+  ventaItems VentaItem[]
+
+  @@index([idSecond])
+  @@map("productos")
+}
+
+model Venta {
+  id       Int      @id @default(autoincrement())
+  idSecond Int      @map("id_second")
+  fecha    DateTime @default(now())
+  total    Float
+
+  secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
+  items      VentaItem[]
+
+  @@index([idSecond])
+  @@map("ventas")
+}
+
+model VentaItem {
+  id             Int   @id @default(autoincrement())
+  idSecond       Int   @map("id_second")
+  idVenta        Int   @map("id_venta")
+  idProducto     Int   @map("id_producto")
+  precioUnitario Float @map("precio_unitario")
+
+  secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
+  venta      Venta      @relation(fields: [idVenta], references: [id], onDelete: Cascade)
+  producto   Producto   @relation(fields: [idProducto], references: [id])
+
+  @@index([idSecond])
+  @@map("venta_items")
+}
+
+model MenuPrecio {
+  id       Int    @id @default(autoincrement())
+  idSecond Int    @map("id_second")
+  nombre   String
+  precio   Float
+
+  secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
+
+  @@index([idSecond])
+  @@map("menu_precios")
+}
