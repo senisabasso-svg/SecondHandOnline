@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
+import { EM, ELLIPSIS, T } from "../lib/uiText";
 
 type Proveedor = { id: number; nombre: string; telefono: string | null; email: string | null };
-
-const EM = "\u2014";
 
 export default function ProveedoresPage() {
   const [rows, setRows] = useState<Proveedor[]>([]);
@@ -60,7 +59,7 @@ export default function ProveedoresPage() {
             <input value={form.nombre} onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))} required />
           </label>
           <label>
-            TelÃ©fono
+            {T.telefono}
             <input value={form.telefono} onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))} />
           </label>
           <label>
@@ -79,7 +78,7 @@ export default function ProveedoresPage() {
       <section className="card mt-lg">
         <h2>Proveedores</h2>
         {loading ? (
-          <p>Cargando\u2026</p>
+          <p>{"Cargando" + ELLIPSIS}</p>
         ) : (
           <div className="table-wrap">
             <table>
@@ -87,7 +86,7 @@ export default function ProveedoresPage() {
                 <tr>
                   <th>ID</th>
                   <th>Nombre</th>
-                  <th>TelÃ©fono</th>
+                  <th>{T.telefono}</th>
                   <th>Email</th>
                 </tr>
               </thead>

@@ -30,10 +30,10 @@ function TenantLayout() {
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
           <span className="muted" style={{ fontSize: "0.85rem" }}>
             {usuario?.email}
-            {usuario?.idSecond != null && ` Â· Tienda #${usuario.idSecond}`}
+            {usuario?.idSecond != null && ` \u00b7 Tienda #${usuario.idSecond}`}
           </span>
           <button type="button" className="btn btn-secondary" onClick={logout}>
-            Cerrar sesion
+            {"Cerrar sesi\u00f3n"}
           </button>
         </div>
       </header>

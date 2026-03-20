@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
+import { EM, ELLIPSIS, T } from "../lib/uiText";
 import type { Producto } from "./VentaPage";
 
 type Proveedor = { id: number; nombre: string; telefono: string | null; email: string | null };
@@ -44,7 +45,7 @@ export default function ProductosPage() {
     e.preventDefault();
     setMsg(null);
     if (!form.descripcion || !form.precioVenta || !form.idProveedor) {
-      setMsg("Completa descripciÃ³n, precio y proveedor.");
+      setMsg(T.completaProducto);
       return;
     }
     try {
@@ -85,7 +86,7 @@ export default function ProductosPage() {
         <h2>Nuevo producto</h2>
         <form className="form-grid" onSubmit={submit}>
           <label>
-            DescripciÃ³n *
+            {T.descripcion} *
             <input
               value={form.descripcion}
               onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
@@ -105,7 +106,7 @@ export default function ProductosPage() {
             <input value={form.color} onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))} />
           </label>
           <label>
-            CondiciÃ³n
+            {T.condicion}
             <input value={form.condicion} onChange={(e) => setForm((f) => ({ ...f, condicion: e.target.value }))} />
           </label>
           <label>
@@ -130,7 +131,7 @@ export default function ProductosPage() {
               onChange={(e) => setForm((f) => ({ ...f, idProveedor: e.target.value }))}
               required
             >
-              <option value="">â€” Elegir â€”</option>
+              <option value="">{T.elegirProveedor}</option>
               {proveedores.map((pr) => (
                 <option key={pr.id} value={pr.id}>
                   {pr.nombre}
@@ -150,14 +151,14 @@ export default function ProductosPage() {
       <section className="card mt-lg">
         <h2>Listado de productos</h2>
         {loading ? (
-          <p>Cargandoâ€¦</p>
+          <p>{"Cargando" + ELLIPSIS}</p>
         ) : (
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>DescripciÃ³n</th>
+                  <th>{T.descripcion}</th>
                   <th>Tipo</th>
                   <th>Marca</th>
                   <th>Color</th>
@@ -173,14 +174,14 @@ export default function ProductosPage() {
                   <tr key={p.id}>
                     <td>{p.id}</td>
                     <td>{p.descripcion}</td>
-                    <td>{p.tipoPrenda ?? "â€”"}</td>
-                    <td>{p.marca ?? "â€”"}</td>
-                    <td>{p.color ?? "â€”"}</td>
-                    <td>{p.condicion ?? "â€”"}</td>
-                    <td>{p.talle ?? "â€”"}</td>
+                    <td>{p.tipoPrenda ?? EM}</td>
+                    <td>{p.marca ?? EM}</td>
+                    <td>{p.color ?? EM}</td>
+                    <td>{p.condicion ?? EM}</td>
+                    <td>{p.talle ?? EM}</td>
                     <td>${p.precioVenta.toFixed(2)}</td>
                     <td>{p.estado}</td>
-                    <td>{p.nombreProveedor ?? "â€”"}</td>
+                    <td>{p.nombreProveedor ?? EM}</td>
                   </tr>
                 ))}
               </tbody>

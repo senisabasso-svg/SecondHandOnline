@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
+import { EM, ELLIPSIS, T } from "../lib/uiText";
 
 type Informe = {
   idVenta: number;
@@ -92,7 +93,7 @@ export default function InformesPage() {
           </button>
         </div>
         {loading ? (
-          <p>Cargandoâ€¦</p>
+          <p>{"Cargando" + ELLIPSIS}</p>
         ) : (
           <div className="table-wrap">
             <table>
@@ -106,7 +107,7 @@ export default function InformesPage() {
                   <th>Color</th>
                   <th>P. unit.</th>
                   <th>Proveedor</th>
-                  <th>Tel. prov.</th>
+                  <th>{T.telefono} prov.</th>
                 </tr>
               </thead>
               <tbody>
@@ -115,12 +116,12 @@ export default function InformesPage() {
                     <td>{r.idVenta}</td>
                     <td>{new Date(r.fechaVenta).toLocaleString("es")}</td>
                     <td>{r.descripcionProducto}</td>
-                    <td>{r.tipoPrenda ?? "â€”"}</td>
-                    <td>{r.marca ?? "â€”"}</td>
-                    <td>{r.color ?? "â€”"}</td>
+                    <td>{r.tipoPrenda ?? EM}</td>
+                    <td>{r.marca ?? EM}</td>
+                    <td>{r.color ?? EM}</td>
                     <td>${r.precioUnitario.toFixed(2)}</td>
                     <td>{r.nombreProveedor}</td>
-                    <td>{r.telefonoProveedor ?? "â€”"}</td>
+                    <td>{r.telefonoProveedor ?? EM}</td>
                   </tr>
                 ))}
               </tbody>

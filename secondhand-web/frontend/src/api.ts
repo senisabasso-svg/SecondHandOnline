@@ -1,4 +1,4 @@
-/** Base del API. Si VITE_API_URL no lleva https://, se aÃ±ade (si no, el navegador lo toma como ruta en Pages). */
+/** Base del API: si VITE_API_URL no lleva https://, se antepone (evita rutas relativas en Pages). */
 export function getApiBase(): string {
   const raw = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "";
   if (!raw) return "";
@@ -25,7 +25,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     localStorage.removeItem("sh_token");
     localStorage.removeItem("sh_user");
     if (!path.includes("/auth/login")) window.location.assign("/login");
-    throw new Error("Sesion caducada o no autorizado.");
+    throw new Error("Sesi\u00f3n caducada o no autorizado.");
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
