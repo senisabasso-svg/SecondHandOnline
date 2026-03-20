@@ -12,6 +12,7 @@ model SecondHand {
   nombre    String
   activo    Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at")
+  logoUrl   String?  @map("logo_url")
 
   usuarios    Usuario[]
   proveedores Proveedor[]

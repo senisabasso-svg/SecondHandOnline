@@ -41,6 +41,21 @@ function requireSuperadmin(req, res, next) {
 
 app.get("/health", (_, res) => res.json({ ok: true }));
 
+// Detalles de la tienda del usuario autenticado
+app.get("/api/tienda", authOptional, requireAuth, requireTenant, async (req, res) => {
+  try {
+    const sh = await prisma.secondHand.findUnique({
+      where: { id: req.user.idSecond },
+      select: { id: true, nombre: true, logoUrl: true },
+    });
+    if (!sh) return res.status(404).json({ error: "Tienda no encontrada." });
+    res.json(sh);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;

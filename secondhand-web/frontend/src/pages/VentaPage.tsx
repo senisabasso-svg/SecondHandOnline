@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { EM, ELLIPSIS, T } from "../lib/uiText";
+import { useMemo } from "react";
 
 export type Producto = {
   id: number;
@@ -23,6 +24,7 @@ export type TicketData = {
   fechaLabel: string;
   lines: { descripcion: string; precioVenta: number }[];
   total: number;
+  tienda?: { nombre: string; logoUrl?: string } | null;
 };
 
 function escapeHtml(s: string) {
@@ -40,6 +42,11 @@ export default function VentaPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [lastTicket, setLastTicket] = useState<TicketData | null>(null);
+  const [tienda, setTienda] = useState<{ id: number; nombre: string; logoUrl?: string } | null>(null);
+  const [proveedores, setProveedores] = useState<{ id: number; nombre: string }[]>([]);
+  const [filtroTexto, setFiltroTexto] = useState("");
+  const [filtroId, setFiltroId] = useState<string>("");
+  const [filtroProveedor, setFiltroProveedor] = useState<string>("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,7 +62,28 @@ export default function VentaPage() {
 
   useEffect(() => {
     load();
+    api<{ id: number; nombre: string; logoUrl?: string }>("/api/tienda").then(setTienda).catch(() => {});
+    api<{ id: number; nombre: string }[]>("/api/proveedores")
+      .then((rows) => setProveedores(rows.map((p) => ({ id: p.id, nombre: p.nombre }))))
+      .catch(() => {});
   }, [load]);
+
+  const disponiblesFiltrados = useMemo(() => {
+    let list = disponibles;
+    const texto = filtroTexto.trim().toLowerCase();
+    const idNum = Number(filtroId);
+    const provNum = Number(filtroProveedor);
+    if (texto) {
+      list = list.filter((p) => (p.descripcion || "").toLowerCase().includes(texto));
+    }
+    if (!Number.isNaN(idNum) && filtroId !== "") {
+      list = list.filter((p) => p.id === idNum);
+    }
+    if (!Number.isNaN(provNum) && filtroProveedor !== "") {
+      list = list.filter((p) => p.idProveedor === provNum);
+    }
+    return list;
+  }, [disponibles, filtroTexto, filtroId, filtroProveedor]);
 
   const addToCart = (p: Producto) => {
     setCart((c) => [...c, p]);
@@ -84,7 +112,7 @@ export default function VentaPage() {
           `<tr><td style="padding:4px 0;border-bottom:1px solid #ddd">${escapeHtml(l.descripcion)}</td><td style="text-align:right;padding:4px 0;border-bottom:1px solid #ddd">$${l.precioVenta.toFixed(2)}</td></tr>`
       )
       .join("");
-    const titulo = "SecondHand \u2014 Ticket de venta";
+    const titulo = escapeHtml(data.tienda?.nombre || "SecondHand") + " — Ticket de venta";
     const gracias = "\u00a1Gracias por su compra!";
     w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ticket #${data.ventaId}</title>
       <style>
@@ -95,6 +123,7 @@ export default function VentaPage() {
         .total{font-weight:bold;font-size:16px;margin-top:12px;padding-top:8px;border-top:2px solid #000}
         @media print{body{padding:8px}}
       </style></head><body>
+      ${data.tienda?.logoUrl ? `<img src=\"${escapeHtml(data.tienda.logoUrl)}\" alt=\"logo\" style=\"width:72px;height:72px;border-radius:50%\"/>` : ``}
       <h1>${titulo}</h1>
       <div class="meta">Venta #${data.ventaId}<br>${escapeHtml(data.fechaLabel)}</div>
       <table><tbody>${rows}</tbody></table>
@@ -134,6 +163,7 @@ export default function VentaPage() {
         fechaLabel,
         lines: snapshot,
         total: totalVenta,
+        tienda,
       };
       setLastTicket(ticket);
       setCart([]);
@@ -151,6 +181,37 @@ export default function VentaPage() {
     <div className="page venta-grid">
       <section className="card">
         <h2>Prendas disponibles</h2>
+        <div className="form-grid" style={{ gridTemplateColumns: "1fr 180px 220px", gap: "0.5rem", marginBottom: "0.5rem" }}>
+          <label style={{ display: "flex", flexDirection: "column" }}>
+            <span className="muted" style={{ fontSize: 12 }}>Buscar por descripción</span>
+            <input
+              type="text"
+              placeholder="Ej: campera, jean..."
+              value={filtroTexto}
+              onChange={(e) => setFiltroTexto(e.target.value)}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column" }}>
+            <span className="muted" style={{ fontSize: 12 }}>Buscar por ID</span>
+            <input
+              type="number"
+              min="1"
+              inputMode="numeric"
+              placeholder="ID"
+              value={filtroId}
+              onChange={(e) => setFiltroId(e.target.value)}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column" }}>
+            <span className="muted" style={{ fontSize: 12 }}>Filtrar por proveedor</span>
+            <select value={filtroProveedor} onChange={(e) => setFiltroProveedor(e.target.value)}>
+              <option value="">Todos</option>
+              {proveedores.map((p) => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </select>
+          </label>
+        </div>
         {loading ? (
           <p>{"Cargando" + ELLIPSIS}</p>
         ) : (
@@ -170,7 +231,7 @@ export default function VentaPage() {
                 </tr>
               </thead>
               <tbody>
-                {disponibles.map((p) => (
+                {disponiblesFiltrados.map((p) => (
                   <tr key={p.id}>
                     <td>{p.id}</td>
                     <td>{p.descripcion}</td>

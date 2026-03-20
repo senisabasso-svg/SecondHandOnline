@@ -10,6 +10,9 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
+    "import:export-sqlite": "python ./scripts/export_sqlite_to_json.py",
+    "import:from-json": "node ./scripts/import_from_json.js",
+    "db:wipe-core": "node ./scripts/wipe_core_tables.js",
     "postinstall": "prisma generate"
   },
   "prisma": {
