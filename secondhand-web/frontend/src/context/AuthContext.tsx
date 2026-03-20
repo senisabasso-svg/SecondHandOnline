@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { getApiBase } from "../api";
 
 const TOKEN_KEY = "sh_token";
 const USER_KEY = "sh_user";
@@ -48,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    const base = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
+    const base = getApiBase();
     const url = base ? `${base}/api/auth/me` : "/api/auth/me";
     fetch(url, { headers: { Authorization: `Bearer ${t}` } })
       .then((r) => {
@@ -77,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const base = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
+      const base = getApiBase();
       const url = base ? `${base}/api/auth/login` : "/api/auth/login";
       const res = await fetch(url, {
         method: "POST",

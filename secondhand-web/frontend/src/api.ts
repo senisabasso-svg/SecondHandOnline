@@ -1,4 +1,11 @@
-﻿const base = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
+/** Base del API. Si VITE_API_URL no lleva https://, se aÃ±ade (si no, el navegador lo toma como ruta en Pages). */
+export function getApiBase(): string {
+  const raw = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || "";
+  if (!raw) return "";
+  const noTrailing = raw.replace(/\/+$/, "");
+  if (/^https?:\/\//i.test(noTrailing)) return noTrailing;
+  return `https://${noTrailing}`;
+}
 
 function authHeaders(): HeadersInit {
   const t = localStorage.getItem("sh_token");
@@ -8,7 +15,8 @@ function authHeaders(): HeadersInit {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const url = base ? `${base}${path}` : path;
+  const base = getApiBase();
+  const url = base ? `${base}${path.startsWith("/") ? path : `/${path}`}` : path;
   const res = await fetch(url, {
     ...init,
     headers: { ...authHeaders(), ...init?.headers },
@@ -17,7 +25,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     localStorage.removeItem("sh_token");
     localStorage.removeItem("sh_user");
     if (!path.includes("/auth/login")) window.location.assign("/login");
-    throw new Error("Sesión caducada o no autorizado.");
+    throw new Error("Sesion caducada o no autorizado.");
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

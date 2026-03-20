@@ -3,6 +3,8 @@ import { api } from "../api";
 
 type Proveedor = { id: number; nombre: string; telefono: string | null; email: string | null };
 
+const EM = "\u2014";
+
 export default function ProveedoresPage() {
   const [rows, setRows] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +79,7 @@ export default function ProveedoresPage() {
       <section className="card mt-lg">
         <h2>Proveedores</h2>
         {loading ? (
-          <p>Cargandoâ€¦</p>
+          <p>Cargando\u2026</p>
         ) : (
           <div className="table-wrap">
             <table>
@@ -94,8 +96,8 @@ export default function ProveedoresPage() {
                   <tr key={r.id}>
                     <td>{r.id}</td>
                     <td>{r.nombre}</td>
-                    <td>{r.telefono ?? "â€”"}</td>
-                    <td>{r.email ?? "â€”"}</td>
+                    <td>{r.telefono ?? EM}</td>
+                    <td>{r.email ?? EM}</td>
                   </tr>
                 ))}
               </tbody>
