@@ -2,7 +2,7 @@
 import { api } from "../api";
 import { useAuth } from "../context/AuthContext";
 
-type SecondHandRow = { id: number; nombre: string; activo: boolean; createdAt: string };
+type SecondHandRow = { id: number; nombre: string; activo: boolean; createdAt: string; logoUrl: string | null };
 
 export default function SuperadminPage() {
   const { usuario, logout } = useAuth();
@@ -10,6 +10,9 @@ export default function SuperadminPage() {
   const [nombreTienda, setNombreTienda] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [msgUser, setMsgUser] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [formEdit, setFormEdit] = useState({ nombre: "", activo: true, logoUrl: "" });
+  const [saving, setSaving] = useState(false);
   const [formUser, setFormUser] = useState({
     email: "",
     password: "",
@@ -44,6 +47,40 @@ export default function SuperadminPage() {
       setMsg("Tienda creada. Use el idSecond mostrado para dar de alta usuarios.");
     } catch (e) {
       setMsg(String(e));
+    }
+  };
+
+  const iniciarEdicion = (t: SecondHandRow) => {
+    setEditingId(t.id);
+    setFormEdit({ nombre: t.nombre, activo: t.activo, logoUrl: t.logoUrl || "" });
+  };
+
+  const cancelarEdicion = () => {
+    setEditingId(null);
+    setFormEdit({ nombre: "", activo: true, logoUrl: "" });
+  };
+
+  const guardarEdicion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingId) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      await api(`/api/super/second-hands/${editingId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          nombre: formEdit.nombre.trim(),
+          activo: formEdit.activo,
+          logoUrl: formEdit.logoUrl.trim() || null,
+        }),
+      });
+      await load();
+      cancelarEdicion();
+      setMsg("Tienda actualizada correctamente.");
+    } catch (e) {
+      setMsg(String(e));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -116,20 +153,102 @@ export default function SuperadminPage() {
               <thead>
                 <tr>
                   <th>idSecond (ID)</th>
+                  <th>Logo</th>
                   <th>Nombre</th>
                   <th>Activa</th>
                   <th>Alta</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {tiendas.map((t) => (
                   <tr key={t.id}>
-                    <td>
-                      <strong>{t.id}</strong>
-                    </td>
-                    <td>{t.nombre}</td>
-                    <td>{t.activo ? "Sí" : "No"}</td>
-                    <td>{new Date(t.createdAt).toLocaleString("es")}</td>
+                    {editingId === t.id ? (
+                      <>
+                        <td>
+                          <strong>{t.id}</strong>
+                        </td>
+                        <td colSpan={5}>
+                          <form onSubmit={guardarEdicion} className="form-grid" style={{ maxWidth: 600, margin: "0.5rem 0" }}>
+                            <label>
+                              Nombre
+                              <input
+                                value={formEdit.nombre}
+                                onChange={(e) => setFormEdit((f) => ({ ...f, nombre: e.target.value }))}
+                                required
+                              />
+                            </label>
+                            <label>
+                              Logo URL (ruta en /public, ej: /romilogo.jpeg)
+                              <input
+                                value={formEdit.logoUrl}
+                                onChange={(e) => setFormEdit((f) => ({ ...f, logoUrl: e.target.value }))}
+                                placeholder="/logos/tienda.png"
+                              />
+                            </label>
+                            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <input
+                                type="checkbox"
+                                checked={formEdit.activo}
+                                onChange={(e) => setFormEdit((f) => ({ ...f, activo: e.target.checked }))}
+                              />
+                              Tienda activa
+                            </label>
+                            {formEdit.logoUrl && (
+                              <div style={{ marginTop: "0.5rem" }}>
+                                <strong>Vista previa:</strong>
+                                <div style={{ marginTop: "0.25rem" }}>
+                                  <img
+                                    src={formEdit.logoUrl}
+                                    alt="Logo"
+                                    style={{ maxWidth: 80, maxHeight: 80, objectFit: "contain", border: "1px solid #ddd", borderRadius: 4 }}
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = "none";
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            <div className="form-actions" style={{ marginTop: "0.5rem" }}>
+                              <button type="submit" className="btn btn-primary" disabled={saving}>
+                                {saving ? "Guardando..." : "Guardar"}
+                              </button>
+                              <button type="button" className="btn btn-secondary" onClick={cancelarEdicion} disabled={saving}>
+                                Cancelar
+                              </button>
+                            </div>
+                          </form>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td>
+                          <strong>{t.id}</strong>
+                        </td>
+                        <td>
+                          {t.logoUrl ? (
+                            <img
+                              src={t.logoUrl}
+                              alt="Logo"
+                              style={{ maxWidth: 50, maxHeight: 50, objectFit: "contain" }}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = "none";
+                              }}
+                            />
+                          ) : (
+                            <span className="muted" style={{ fontSize: "0.85rem" }}>Sin logo</span>
+                          )}
+                        </td>
+                        <td>{t.nombre}</td>
+                        <td>{t.activo ? "Sí" : "No"}</td>
+                        <td>{new Date(t.createdAt).toLocaleString("es")}</td>
+                        <td>
+                          <button type="button" className="btn btn-ghost" onClick={() => iniciarEdicion(t)}>
+                            Editar
+                          </button>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>

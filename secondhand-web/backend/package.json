@@ -13,6 +13,7 @@
     "import:export-sqlite": "python ./scripts/export_sqlite_to_json.py",
     "import:from-json": "node ./scripts/import_from_json.js",
     "db:wipe-core": "node ./scripts/wipe_core_tables.js",
+    "db:reset-seq": "node ./scripts/reset_sequences.js",
     "postinstall": "prisma generate"
   },
   "prisma": {

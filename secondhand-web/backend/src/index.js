@@ -107,6 +107,23 @@ app.post("/api/super/second-hands", authOptional, requireAuth, requireSuperadmin
   }
 });
 
+app.put("/api/super/second-hands/:id", authOptional, requireAuth, requireSuperadmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { nombre, activo, logoUrl } = req.body;
+    const updateData = {};
+    if (nombre !== undefined) updateData.nombre = nombre?.trim() || null;
+    if (activo !== undefined) updateData.activo = Boolean(activo);
+    if (logoUrl !== undefined) updateData.logoUrl = logoUrl?.trim() || null;
+    const row = await prisma.secondHand.update({ where: { id }, data: updateData });
+    res.json(row);
+  } catch (e) {
+    if (e.code === "P2025") return res.status(404).json({ error: "Tienda no encontrada." });
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
 app.post("/api/super/usuarios", authOptional, requireAuth, requireSuperadmin, async (req, res) => {
   try {
     const { email, password, idSecond, nombre, rol } = req.body;
