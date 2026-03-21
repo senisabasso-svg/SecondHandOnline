@@ -23,6 +23,7 @@ export default function InformesPage() {
   const [informes, setInformes] = useState<Informe[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [filtro, setFiltro] = useState<string>("");
+  const [mes, setMes] = useState<string>("");
   const [totalProv, setTotalProv] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
@@ -40,15 +41,16 @@ export default function InformesPage() {
     setMsg(null);
     try {
       const id = filtro ? Number(filtro) : null;
+      const qs = mes ? `?month=${encodeURIComponent(mes)}` : "";
       if (id) {
         const [rows, tot] = await Promise.all([
-          api<Informe[]>(`/api/informes/proveedor/${id}`),
-          api<{ total: number }>(`/api/informes/proveedor/${id}/total`),
+          api<Informe[]>(`/api/informes/proveedor/${id}${qs}`),
+          api<{ total: number }>(`/api/informes/proveedor/${id}/total${qs}`),
         ]);
         setInformes(rows);
         setTotalProv(tot.total);
       } else {
-        const rows = await api<Informe[]>("/api/informes");
+        const rows = await api<Informe[]>(`/api/informes${qs}`);
         setInformes(rows);
         setTotalProv(null);
       }
@@ -57,7 +59,7 @@ export default function InformesPage() {
     } finally {
       setLoading(false);
     }
-  }, [filtro]);
+  }, [filtro, mes]);
 
   useEffect(() => {
     loadProveedores();
@@ -72,6 +74,14 @@ export default function InformesPage() {
       <section className="card">
         <h2>Informes de ventas</h2>
         <div className="filter-row">
+          <label>
+            Mes
+            <input
+              type="month"
+              value={mes}
+              onChange={(e) => setMes(e.target.value)}
+            />
+          </label>
           <label>
             Filtrar por proveedor
             <select value={filtro} onChange={(e) => setFiltro(e.target.value)}>

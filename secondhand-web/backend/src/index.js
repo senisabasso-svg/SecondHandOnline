@@ -312,8 +312,19 @@ app.post("/api/ventas", async (req, res) => {
 
 app.get("/api/informes", async (req, res) => {
   try {
+    const { month, from, to } = req.query;
+    let where = { ...tw(req) };
+    if (month && typeof month === "string" && /^\d{4}-\d{2}$/.test(month)) {
+      const start = new Date(`${month}-01T00:00:00.000Z`);
+      const end = new Date(new Date(start).setMonth(start.getMonth() + 1));
+      where = { ...where, venta: { fecha: { gte: start, lt: end } } };
+    } else if (from || to) {
+      const gte = from ? new Date(String(from)) : undefined;
+      const lt = to ? new Date(String(to)) : undefined;
+      where = { ...where, venta: { fecha: { ...(gte ? { gte } : {}), ...(lt ? { lt } : {}) } } };
+    }
     const items = await prisma.ventaItem.findMany({
-      where: tw(req),
+      where,
       include: { venta: true, producto: { include: { proveedor: true } } },
       orderBy: [{ venta: { fecha: "desc" } }, { idVenta: "desc" }],
     });
@@ -344,8 +355,19 @@ app.get("/api/informes/proveedor/:id", async (req, res) => {
     const id = Number(req.params.id);
     const prov = await prisma.proveedor.findFirst({ where: { id, idSecond: req.user.idSecond } });
     if (!prov) return res.status(404).json({ error: "Proveedor no encontrado." });
+    const { month, from, to } = req.query;
+    let where = { idSecond: req.user.idSecond, producto: { idProveedor: id } };
+    if (month && typeof month === "string" && /^\d{4}-\d{2}$/.test(month)) {
+      const start = new Date(`${month}-01T00:00:00.000Z`);
+      const end = new Date(new Date(start).setMonth(start.getMonth() + 1));
+      where = { ...where, venta: { fecha: { gte: start, lt: end } } };
+    } else if (from || to) {
+      const gte = from ? new Date(String(from)) : undefined;
+      const lt = to ? new Date(String(to)) : undefined;
+      where = { ...where, venta: { fecha: { ...(gte ? { gte } : {}), ...(lt ? { lt } : {}) } } };
+    }
     const items = await prisma.ventaItem.findMany({
-      where: { idSecond: req.user.idSecond, producto: { idProveedor: id } },
+      where,
       include: { venta: true, producto: { include: { proveedor: true } } },
       orderBy: [{ venta: { fecha: "desc" } }, { idVenta: "desc" }],
     });
@@ -376,8 +398,19 @@ app.get("/api/informes/proveedor/:id/total", async (req, res) => {
     const id = Number(req.params.id);
     const prov = await prisma.proveedor.findFirst({ where: { id, idSecond: req.user.idSecond } });
     if (!prov) return res.status(404).json({ error: "Proveedor no encontrado." });
+    const { month, from, to } = req.query;
+    let where = { idSecond: req.user.idSecond, producto: { idProveedor: id } };
+    if (month && typeof month === "string" && /^\d{4}-\d{2}$/.test(month)) {
+      const start = new Date(`${month}-01T00:00:00.000Z`);
+      const end = new Date(new Date(start).setMonth(start.getMonth() + 1));
+      where = { ...where, venta: { fecha: { gte: start, lt: end } } };
+    } else if (from || to) {
+      const gte = from ? new Date(String(from)) : undefined;
+      const lt = to ? new Date(String(to)) : undefined;
+      where = { ...where, venta: { fecha: { ...(gte ? { gte } : {}), ...(lt ? { lt } : {}) } } };
+    }
     const agg = await prisma.ventaItem.aggregate({
-      where: { idSecond: req.user.idSecond, producto: { idProveedor: id } },
+      where,
       _sum: { precioUnitario: true },
     });
     res.json({ total: agg._sum.precioUnitario ?? 0 });
