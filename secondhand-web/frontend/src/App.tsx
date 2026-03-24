@@ -1,5 +1,7 @@
 import { Routes, Route, NavLink, Navigate, Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useAuth } from "./context/AuthContext";
+import { api } from "./api";
 import VentaPage from "./pages/VentaPage";
 import ProductosPage from "./pages/ProductosPage";
 import ProveedoresPage from "./pages/ProveedoresPage";
@@ -9,10 +11,28 @@ import SuperadminPage from "./pages/SuperadminPage";
 
 function TenantLayout() {
   const { usuario, logout } = useAuth();
+  const [tienda, setTienda] = useState<{ id: number; nombre: string; logoUrl?: string | null } | null>(null);
+
+  useEffect(() => {
+    if (!usuario?.idSecond) return;
+    api<{ id: number; nombre: string; logoUrl?: string | null }>("/api/tienda")
+      .then(setTienda)
+      .catch(() => setTienda(null));
+  }, [usuario?.idSecond]);
+
   return (
     <div className="app">
       <header className="header">
-        <h1 className="logo">SecondHand</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          {tienda?.logoUrl ? (
+            <img
+              src={tienda.logoUrl}
+              alt="Logo tienda"
+              style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }}
+            />
+          ) : null}
+          <h1 className="logo">{tienda?.nombre || "SecondHand"}</h1>
+        </div>
         <nav className="nav">
           <NavLink to="/" end className={({ isActive }) => (isActive ? "active" : "")}>
             Venta
@@ -30,7 +50,7 @@ function TenantLayout() {
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
           <span className="muted" style={{ fontSize: "0.85rem" }}>
             {usuario?.email}
-            {usuario?.idSecond != null && ` \u00b7 Tienda #${usuario.idSecond}`}
+            {tienda?.nombre ? ` · ${tienda.nombre}` : usuario?.idSecond != null ? ` · Tienda #${usuario.idSecond}` : ""}
           </span>
           <button type="button" className="btn btn-secondary" onClick={logout}>
             {"Cerrar sesi\u00f3n"}
