@@ -10,6 +10,7 @@ export default function ProductosPage() {
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
+  const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState({
     descripcion: "",
     tipoPrenda: "",
@@ -19,6 +20,17 @@ export default function ProductosPage() {
     precioVenta: "",
     talle: "",
     idProveedor: "",
+  });
+  const [formEdit, setFormEdit] = useState({
+    descripcion: "",
+    tipoPrenda: "",
+    marca: "",
+    color: "",
+    condicion: "",
+    precioVenta: "",
+    talle: "",
+    idProveedor: "",
+    estado: "disponible",
   });
 
   const load = useCallback(async () => {
@@ -40,6 +52,53 @@ export default function ProductosPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const startEdit = (p: Producto) => {
+    setEditId(p.id);
+    setFormEdit({
+      descripcion: p.descripcion || "",
+      tipoPrenda: p.tipoPrenda || "",
+      marca: p.marca || "",
+      color: p.color || "",
+      condicion: p.condicion || "",
+      precioVenta: String(p.precioVenta ?? ""),
+      talle: p.talle || "",
+      idProveedor: String(p.idProveedor ?? ""),
+      estado: p.estado || "disponible",
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const cancelEdit = () => {
+    setEditId(null);
+  };
+
+  const saveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editId) return;
+    setMsg(null);
+    try {
+      await api(`/api/productos/${editId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          descripcion: formEdit.descripcion,
+          tipoPrenda: formEdit.tipoPrenda || null,
+          marca: formEdit.marca || null,
+          color: formEdit.color || null,
+          condicion: formEdit.condicion || null,
+          precioVenta: Number(formEdit.precioVenta),
+          talle: formEdit.talle || null,
+          idProveedor: Number(formEdit.idProveedor),
+          estado: formEdit.estado,
+        }),
+      });
+      await load();
+      setMsg("Producto actualizado.");
+      setEditId(null);
+    } catch (e) {
+      setMsg(String(e));
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,31 +142,57 @@ export default function ProductosPage() {
   return (
     <div className="page">
       <section className="card">
-        <h2>Nuevo producto</h2>
-        <form className="form-grid" onSubmit={submit}>
+        <h2>{editId ? `Editar producto #${editId}` : "Nuevo producto"}</h2>
+        <form className="form-grid" onSubmit={editId ? saveEdit : submit}>
           <label>
             {T.descripcion} *
             <input
-              value={form.descripcion}
-              onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
+              value={editId ? formEdit.descripcion : form.descripcion}
+              onChange={(e) =>
+                editId
+                  ? setFormEdit((f) => ({ ...f, descripcion: e.target.value }))
+                  : setForm((f) => ({ ...f, descripcion: e.target.value }))
+              }
               required
             />
           </label>
           <label>
             Tipo de prenda
-            <input value={form.tipoPrenda} onChange={(e) => setForm((f) => ({ ...f, tipoPrenda: e.target.value }))} />
+            <input
+              value={editId ? formEdit.tipoPrenda : form.tipoPrenda}
+              onChange={(e) =>
+                editId ? setFormEdit((f) => ({ ...f, tipoPrenda: e.target.value })) : setForm((f) => ({ ...f, tipoPrenda: e.target.value }))
+              }
+            />
           </label>
           <label>
             Marca
-            <input value={form.marca} onChange={(e) => setForm((f) => ({ ...f, marca: e.target.value }))} />
+            <input
+              value={editId ? formEdit.marca : form.marca}
+              onChange={(e) =>
+                editId ? setFormEdit((f) => ({ ...f, marca: e.target.value })) : setForm((f) => ({ ...f, marca: e.target.value }))
+              }
+            />
           </label>
           <label>
             Color
-            <input value={form.color} onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))} />
+            <input
+              value={editId ? formEdit.color : form.color}
+              onChange={(e) =>
+                editId ? setFormEdit((f) => ({ ...f, color: e.target.value })) : setForm((f) => ({ ...f, color: e.target.value }))
+              }
+            />
           </label>
           <label>
             {T.condicion}
-            <input value={form.condicion} onChange={(e) => setForm((f) => ({ ...f, condicion: e.target.value }))} />
+            <input
+              value={editId ? formEdit.condicion : form.condicion}
+              onChange={(e) =>
+                editId
+                  ? setFormEdit((f) => ({ ...f, condicion: e.target.value }))
+                  : setForm((f) => ({ ...f, condicion: e.target.value }))
+              }
+            />
           </label>
           <label>
             Precio venta *
@@ -115,20 +200,33 @@ export default function ProductosPage() {
               type="number"
               step="0.01"
               min="0"
-              value={form.precioVenta}
-              onChange={(e) => setForm((f) => ({ ...f, precioVenta: e.target.value }))}
+              value={editId ? formEdit.precioVenta : form.precioVenta}
+              onChange={(e) =>
+                editId
+                  ? setFormEdit((f) => ({ ...f, precioVenta: e.target.value }))
+                  : setForm((f) => ({ ...f, precioVenta: e.target.value }))
+              }
               required
             />
           </label>
           <label>
             Talle
-            <input value={form.talle} onChange={(e) => setForm((f) => ({ ...f, talle: e.target.value }))} />
+            <input
+              value={editId ? formEdit.talle : form.talle}
+              onChange={(e) =>
+                editId ? setFormEdit((f) => ({ ...f, talle: e.target.value })) : setForm((f) => ({ ...f, talle: e.target.value }))
+              }
+            />
           </label>
           <label>
             Proveedor *
             <select
-              value={form.idProveedor}
-              onChange={(e) => setForm((f) => ({ ...f, idProveedor: e.target.value }))}
+              value={editId ? formEdit.idProveedor : form.idProveedor}
+              onChange={(e) =>
+                editId
+                  ? setFormEdit((f) => ({ ...f, idProveedor: e.target.value }))
+                  : setForm((f) => ({ ...f, idProveedor: e.target.value }))
+              }
               required
             >
               <option value="">{T.elegirProveedor}</option>
@@ -139,13 +237,27 @@ export default function ProductosPage() {
               ))}
             </select>
           </label>
+          {editId && (
+            <label>
+              Estado
+              <select value={formEdit.estado} onChange={(e) => setFormEdit((f) => ({ ...f, estado: e.target.value }))}>
+                <option value="disponible">disponible</option>
+                <option value="vendido">vendido</option>
+              </select>
+            </label>
+          )}
           <div className="form-actions">
-            <button type="submit" className="btn btn-primary">
-              Guardar
-            </button>
+            {editId ? (
+              <>
+                <button type="submit" className="btn btn-primary">Guardar cambios</button>
+                <button type="button" className="btn btn-secondary" onClick={cancelEdit}>Cancelar</button>
+              </>
+            ) : (
+              <button type="submit" className="btn btn-primary">Guardar</button>
+            )}
           </div>
         </form>
-        {msg && <p className={msg.includes("agregado") ? "ok" : "err"}>{msg}</p>}
+        {msg && <p className={msg.includes("agregado") || msg.includes("actualizado") ? "ok" : "err"}>{msg}</p>}
       </section>
 
       <section className="card mt-lg">
@@ -182,6 +294,11 @@ export default function ProductosPage() {
                     <td>${p.precioVenta.toFixed(2)}</td>
                     <td>{p.estado}</td>
                     <td>{p.nombreProveedor ?? EM}</td>
+                    <td>
+                      <button type="button" className="btn btn-ghost" onClick={() => startEdit(p)}>
+                        Editar
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

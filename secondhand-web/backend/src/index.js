@@ -275,6 +275,49 @@ app.post("/api/productos", async (req, res) => {
   }
 });
 
+app.put("/api/productos/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const existente = await prisma.producto.findFirst({ where: { id, idSecond: req.user.idSecond } });
+    if (!existente) return res.status(404).json({ error: "Producto no encontrado en su tienda." });
+    const { descripcion, tipoPrenda, marca, color, condicion, precioVenta, talle, idProveedor, estado } = req.body;
+    if (idProveedor) {
+      const prov = await prisma.proveedor.findFirst({ where: { id: Number(idProveedor), idSecond: req.user.idSecond } });
+      if (!prov) return res.status(400).json({ error: "Proveedor no vÃ¡lido para esta tienda." });
+    }
+    const updated = await prisma.producto.update({
+      where: { id },
+      data: {
+        ...(descripcion !== undefined ? { descripcion } : {}),
+        ...(tipoPrenda !== undefined ? { tipoPrenda: tipoPrenda || null } : {}),
+        ...(marca !== undefined ? { marca: marca || null } : {}),
+        ...(color !== undefined ? { color: color || null } : {}),
+        ...(condicion !== undefined ? { condicion: condicion || null } : {}),
+        ...(precioVenta !== undefined ? { precioVenta: Number(precioVenta) } : {}),
+        ...(talle !== undefined ? { talle: talle || null } : {}),
+        ...(idProveedor !== undefined ? { idProveedor: Number(idProveedor) } : {}),
+        ...(estado !== undefined ? { estado } : {}),
+      },
+      include: { proveedor: true },
+    });
+    res.json({
+      id: updated.id,
+      descripcion: updated.descripcion,
+      tipoPrenda: updated.tipoPrenda,
+      marca: updated.marca,
+      color: updated.color,
+      condicion: updated.condicion,
+      precioVenta: updated.precioVenta,
+      talle: updated.talle,
+      idProveedor: updated.idProveedor,
+      estado: updated.estado,
+      nombreProveedor: updated.proveedor?.nombre,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
 app.post("/api/ventas", async (req, res) => {
   const { items } = req.body;
   if (!Array.isArray(items) || items.length === 0) {
