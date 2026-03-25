@@ -23,14 +23,21 @@ function normalizePhoneForWhatsApp(raw?: string | null) {
   if (!raw) return "";
   let digits = raw.replace(/\D+/g, "");
   if (!digits) return "";
-  // Uruguay (+598)
-  if (digits.startsWith("598")) return digits;
   // Formato internacional con 00 (ej: 00598...)
   if (digits.startsWith("00")) digits = digits.slice(2);
+
+  // Ya está en Uruguay
   if (digits.startsWith("598")) return digits;
-  // Formato local móvil UY: 09XXXXXXXX -> 5989XXXXXXX
+
+  // Caso común mal formado: 5409xxxxxxx / 549xxxxxxx -> convertir a UY 5989xxxxxxx
+  if (digits.startsWith("54")) {
+    digits = digits.slice(2);
+  }
+
+  // Local UY: 09xxxxxxx -> 9xxxxxxx
   if (digits.startsWith("0")) digits = digits.slice(1);
-  // Si queda número local, anteponemos código país de Uruguay
+
+  // Si no empieza con 9 y parece local de 8 dígitos, igual lo pasamos a UY.
   return `598${digits}`;
 }
 
