@@ -21,11 +21,17 @@ type Proveedor = { id: number; nombre: string; telefono?: string | null };
 
 function normalizePhoneForWhatsApp(raw?: string | null) {
   if (!raw) return "";
-  const digits = raw.replace(/\D+/g, "");
+  let digits = raw.replace(/\D+/g, "");
   if (!digits) return "";
-  // Si viene sin código país, asumimos AR (+54)
-  if (digits.startsWith("54")) return digits;
-  return `54${digits}`;
+  // Uruguay (+598)
+  if (digits.startsWith("598")) return digits;
+  // Formato internacional con 00 (ej: 00598...)
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.startsWith("598")) return digits;
+  // Formato local móvil UY: 09XXXXXXXX -> 5989XXXXXXX
+  if (digits.startsWith("0")) digits = digits.slice(1);
+  // Si queda número local, anteponemos código país de Uruguay
+  return `598${digits}`;
 }
 
 export default function InformesPage() {
