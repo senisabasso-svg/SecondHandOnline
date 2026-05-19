@@ -173,6 +173,39 @@ body {
   font-size: 0.9rem;
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(31, 41, 55, 0.45);
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+}
+
+.modal-card h3 {
+  margin: 0 0 0.5rem;
+  color: var(--header);
+}
+
+.modal-pago-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
 .venta-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

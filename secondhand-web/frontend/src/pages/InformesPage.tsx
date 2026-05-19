@@ -2,10 +2,17 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import { EM, ELLIPSIS, T } from "../lib/uiText";
 
+function labelMedioPago(m?: string | null) {
+  if (m === "efectivo") return "Efectivo";
+  if (m === "tarjeta") return "Tarjeta";
+  return EM;
+}
+
 type Informe = {
   idVenta: number;
   fechaVenta: string;
   totalVenta: number;
+  medioPago?: string | null;
   idProducto: number;
   descripcionProducto: string;
   tipoPrenda: string | null;
@@ -91,6 +98,7 @@ export default function InformesPage() {
     const rows = informes.map((r) => ({
       Venta: r.idVenta,
       Fecha: new Date(r.fechaVenta).toLocaleString("es-AR"),
+      Pago: labelMedioPago(r.medioPago),
       Producto: r.descripcionProducto,
       Tipo: r.tipoPrenda ?? "",
       Marca: r.marca ?? "",
@@ -210,6 +218,7 @@ export default function InformesPage() {
                 <tr>
                   <th>Venta</th>
                   <th>Fecha</th>
+                  <th>Pago</th>
                   <th>Producto</th>
                   <th>Tipo</th>
                   <th>Marca</th>
@@ -224,6 +233,7 @@ export default function InformesPage() {
                   <tr key={`${r.idVenta}-${r.idProducto}-${i}`}>
                     <td>{r.idVenta}</td>
                     <td>{new Date(r.fechaVenta).toLocaleString("es")}</td>
+                    <td>{labelMedioPago(r.medioPago)}</td>
                     <td>{r.descripcionProducto}</td>
                     <td>{r.tipoPrenda ?? EM}</td>
                     <td>{r.marca ?? EM}</td>

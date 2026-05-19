@@ -87,11 +87,12 @@ model CajaSesion {
 }
 
 model Venta {
-  id       Int      @id @default(autoincrement())
-  idSecond Int      @map("id_second")
-  idCaja   Int?     @map("id_caja")
-  fecha    DateTime @default(now())
-  total    Float
+  id        Int      @id @default(autoincrement())
+  idSecond  Int      @map("id_second")
+  idCaja    Int?     @map("id_caja")
+  fecha     DateTime @default(now())
+  total     Float
+  medioPago String?  @map("medio_pago")
 
   secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
   caja       CajaSesion? @relation(fields: [idCaja], references: [id], onDelete: SetNull)

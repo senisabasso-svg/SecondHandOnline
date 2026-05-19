@@ -159,6 +159,8 @@ app.use("/api/menu-precios", authOptional, requireAuth, requireTenant);
 
 const tw = (req) => ({ idSecond: req.user.idSecond });
 
+const MEDIOS_PAGO = new Set(["efectivo", "tarjeta"]);
+
 function dayBounds(d = new Date()) {
   const start = new Date(d);
   start.setHours(0, 0, 0, 0);
@@ -355,6 +357,7 @@ app.get("/api/caja/diario", async (req, res) => {
         fecha: v.fecha,
         total: v.total,
         cantidadItems: v._count.items,
+        medioPago: v.medioPago,
       })),
       totalDia,
     });
@@ -406,9 +409,13 @@ app.post("/api/caja/cerrar", async (req, res) => {
 });
 
 app.post("/api/ventas", async (req, res) => {
-  const { items } = req.body;
+  const { items, medioPago } = req.body;
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: "Debe enviar al menos un artÃ­culo en la venta." });
+  }
+  const medio = typeof medioPago === "string" ? medioPago.trim().toLowerCase() : "";
+  if (!MEDIOS_PAGO.has(medio)) {
+    return res.status(400).json({ error: "Seleccione medio de pago: efectivo o tarjeta." });
   }
   const idSecond = req.user.idSecond;
   try {
@@ -423,7 +430,7 @@ app.post("/api/ventas", async (req, res) => {
     }
     const total = items.reduce((s, i) => s + Number(i.precioUnitario || 0), 0);
     const result = await prisma.$transaction(async (tx) => {
-      const venta = await tx.venta.create({ data: { total, idSecond, idCaja: caja.id } });
+      const venta = await tx.venta.create({ data: { total, idSecond, idCaja: caja.id, medioPago: medio } });
       for (const it of items) {
         await tx.ventaItem.create({
           data: {
@@ -437,7 +444,12 @@ app.post("/api/ventas", async (req, res) => {
       }
       return venta;
     });
-    res.status(201).json({ id: result.id, total: result.total, fecha: result.fecha });
+    res.status(201).json({
+      id: result.id,
+      total: result.total,
+      fecha: result.fecha,
+      medioPago: result.medioPago,
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: String(e.message) });
@@ -467,6 +479,7 @@ app.get("/api/informes", async (req, res) => {
         idVenta: vi.venta.id,
         fechaVenta: vi.venta.fecha,
         totalVenta: vi.venta.total,
+        medioPago: vi.venta.medioPago,
         idProducto: vi.producto.id,
         descripcionProducto: vi.producto.descripcion,
         tipoPrenda: vi.producto.tipoPrenda,
@@ -510,6 +523,7 @@ app.get("/api/informes/proveedor/:id", async (req, res) => {
         idVenta: vi.venta.id,
         fechaVenta: vi.venta.fecha,
         totalVenta: vi.venta.total,
+        medioPago: vi.venta.medioPago,
         idProducto: vi.producto.id,
         descripcionProducto: vi.producto.descripcion,
         tipoPrenda: vi.producto.tipoPrenda,

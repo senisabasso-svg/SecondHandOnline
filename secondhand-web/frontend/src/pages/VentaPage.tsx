@@ -19,15 +19,30 @@ export type Producto = {
 
 type CartLine = Producto;
 
+export type MedioPago = "efectivo" | "tarjeta";
+
 export type TicketData = {
   ventaId: number;
   fechaLabel: string;
   lines: { descripcion: string; precioVenta: number }[];
   total: number;
+  medioPago?: MedioPago | null;
   tienda?: { nombre: string; logoUrl?: string } | null;
 };
 
-type VentaDiaria = { id: number; fecha: string; total: number; cantidadItems: number };
+type VentaDiaria = {
+  id: number;
+  fecha: string;
+  total: number;
+  cantidadItems: number;
+  medioPago?: string | null;
+};
+
+function labelMedioPago(m?: string | null) {
+  if (m === "efectivo") return "Efectivo";
+  if (m === "tarjeta") return "Tarjeta";
+  return EM;
+}
 
 type CajaDiario = {
   sesionAbierta: boolean;
@@ -60,6 +75,7 @@ export default function VentaPage() {
   const [loadingCaja, setLoadingCaja] = useState(true);
   const [cajaBusy, setCajaBusy] = useState(false);
   const [verVentas, setVerVentas] = useState(false);
+  const [modalPago, setModalPago] = useState(false);
 
   const loadCaja = useCallback(async () => {
     setLoadingCaja(true);
@@ -188,7 +204,9 @@ export default function VentaPage() {
       </style></head><body>
       ${data.tienda?.logoUrl ? `<img src=\"${escapeHtml(data.tienda.logoUrl)}\" alt=\"logo\" style=\"width:72px;height:72px;border-radius:50%\"/>` : ``}
       <h1>${titulo}</h1>
-      <div class="meta">Venta #${data.ventaId}<br>${escapeHtml(data.fechaLabel)}</div>
+      <div class="meta">Venta #${data.ventaId}<br>${escapeHtml(data.fechaLabel)}${
+        data.medioPago ? `<br>Pago: ${escapeHtml(labelMedioPago(data.medioPago))}` : ""
+      }</div>
       <table><tbody>${rows}</tbody></table>
       <div class="total">Total: $${data.total.toFixed(2)}</div>
       <p style="margin-top:24px;font-size:11px;color:#666">${gracias}</p>
@@ -198,12 +216,17 @@ export default function VentaPage() {
     w.print();
   };
 
-  const confirmarVenta = async () => {
+  const pedirConfirmacion = () => {
     if (cart.length === 0) return;
     if (!cajaAbierta) {
       setMsg("Debe abrir la caja antes de registrar ventas.");
       return;
     }
+    setModalPago(true);
+  };
+
+  const confirmarVenta = async (medioPago: MedioPago) => {
+    setModalPago(false);
     setSaving(true);
     setMsg(null);
     const snapshot = cart.map((p) => ({
@@ -212,9 +235,10 @@ export default function VentaPage() {
     }));
     const totalVenta = cart.reduce((s, x) => s + x.precioVenta, 0);
     try {
-      const res = await api<{ id: number; total: number; fecha: string }>("/api/ventas", {
+      const res = await api<{ id: number; total: number; fecha: string; medioPago: MedioPago }>("/api/ventas", {
         method: "POST",
         body: JSON.stringify({
+          medioPago,
           items: cart.map((p) => ({
             idProducto: p.id,
             precioUnitario: p.precioVenta,
@@ -230,6 +254,7 @@ export default function VentaPage() {
         fechaLabel,
         lines: snapshot,
         total: totalVenta,
+        medioPago: res.medioPago,
         tienda,
       };
       setLastTicket(ticket);
@@ -312,6 +337,7 @@ export default function VentaPage() {
                   <th>Venta</th>
                   <th>Hora</th>
                   <th>Artículos</th>
+                  <th>Pago</th>
                   <th>Total</th>
                 </tr>
               </thead>
@@ -326,6 +352,7 @@ export default function VentaPage() {
                       })}
                     </td>
                     <td>{v.cantidadItems}</td>
+                    <td>{labelMedioPago(v.medioPago)}</td>
                     <td>${v.total.toFixed(2)}</td>
                   </tr>
                 ))}
@@ -457,7 +484,7 @@ export default function VentaPage() {
             type="button"
             className="btn btn-accent"
             disabled={!cajaAbierta || cart.length === 0 || saving}
-            onClick={confirmarVenta}
+            onClick={pedirConfirmacion}
           >
             {saving ? "Guardando" + ELLIPSIS : "Confirmar venta"}
           </button>
@@ -485,6 +512,47 @@ export default function VentaPage() {
         )}
       </section>
       </div>
+
+      {modalPago && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-pago-titulo"
+          onClick={() => !saving && setModalPago(false)}
+        >
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h3 id="modal-pago-titulo">Medio de pago</h3>
+            <p className="muted">Total a cobrar: <strong>${total.toFixed(2)}</strong></p>
+            <div className="modal-pago-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={saving}
+                onClick={() => confirmarVenta("efectivo")}
+              >
+                Efectivo
+              </button>
+              <button
+                type="button"
+                className="btn btn-accent"
+                disabled={saving}
+                onClick={() => confirmarVenta("tarjeta")}
+              >
+                Tarjeta
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={saving}
+                onClick={() => setModalPago(false)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
