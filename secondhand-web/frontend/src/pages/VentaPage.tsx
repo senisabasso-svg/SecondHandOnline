@@ -59,6 +59,7 @@ export default function VentaPage() {
   const [caja, setCaja] = useState<CajaDiario | null>(null);
   const [loadingCaja, setLoadingCaja] = useState(true);
   const [cajaBusy, setCajaBusy] = useState(false);
+  const [verVentas, setVerVentas] = useState(false);
 
   const loadCaja = useCallback(async () => {
     setLoadingCaja(true);
@@ -263,6 +264,15 @@ export default function VentaPage() {
             <span className={`caja-badge ${cajaAbierta ? "caja-badge-open" : "caja-badge-closed"}`}>
               {cajaAbierta ? "Caja abierta" : "Caja cerrada"}
             </span>
+            {!loadingCaja && caja && caja.ventas.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setVerVentas((v) => !v)}
+              >
+                {verVentas ? "Ocultar ventas" : "Ver ventas"}
+              </button>
+            )}
             {cajaAbierta ? (
               <button
                 type="button"
@@ -286,14 +296,16 @@ export default function VentaPage() {
         </div>
         <p className="total caja-total-dia">
           <strong>Total del día: ${(caja?.totalDia ?? 0).toFixed(2)}</strong>
-          {caja && caja.ventas.length > 0 ? (
+          {loadingCaja ? (
+            <span className="muted"> · Cargando{ELLIPSIS}</span>
+          ) : caja && caja.ventas.length > 0 ? (
             <span className="muted"> · {caja.ventas.length} venta{caja.ventas.length === 1 ? "" : "s"}</span>
-          ) : null}
+          ) : (
+            <span className="muted"> · Sin ventas hoy</span>
+          )}
         </p>
-        {loadingCaja ? (
-          <p>{"Cargando ventas del día" + ELLIPSIS}</p>
-        ) : caja && caja.ventas.length > 0 ? (
-          <div className="table-wrap">
+        {verVentas && caja && caja.ventas.length > 0 && (
+          <div className="table-wrap caja-ventas-detalle">
             <table>
               <thead>
                 <tr>
@@ -320,8 +332,6 @@ export default function VentaPage() {
               </tbody>
             </table>
           </div>
-        ) : (
-          <p className="muted">Aún no hay ventas registradas hoy.</p>
         )}
         {!cajaAbierta && (
           <p className="caja-aviso">Abrí la caja para poder agregar productos al carrito y confirmar ventas.</p>

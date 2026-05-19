@@ -154,7 +154,13 @@ body {
 }
 
 .caja-total-dia {
-  margin: 0 0 0.5rem;
+  margin: 0;
+}
+
+.caja-ventas-detalle {
+  margin-top: 0.75rem;
+  max-height: 220px;
+  overflow-y: auto;
 }
 
 .caja-aviso {
