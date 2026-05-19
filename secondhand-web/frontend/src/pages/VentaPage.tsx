@@ -27,6 +27,15 @@ export type TicketData = {
   tienda?: { nombre: string; logoUrl?: string } | null;
 };
 
+type VentaDiaria = { id: number; fecha: string; total: number; cantidadItems: number };
+
+type CajaDiario = {
+  sesionAbierta: boolean;
+  sesion: { id: number; abiertaEn: string; cerradaEn: string | null } | null;
+  ventas: VentaDiaria[];
+  totalDia: number;
+};
+
 function escapeHtml(s: string) {
   return s
     .replace(/&/g, "&amp;")
@@ -47,6 +56,20 @@ export default function VentaPage() {
   const [filtroTexto, setFiltroTexto] = useState("");
   const [filtroId, setFiltroId] = useState<string>("");
   const [filtroProveedor, setFiltroProveedor] = useState<string>("");
+  const [caja, setCaja] = useState<CajaDiario | null>(null);
+  const [loadingCaja, setLoadingCaja] = useState(true);
+  const [cajaBusy, setCajaBusy] = useState(false);
+
+  const loadCaja = useCallback(async () => {
+    setLoadingCaja(true);
+    try {
+      setCaja(await api<CajaDiario>("/api/caja/diario"));
+    } catch (e) {
+      setMsg(String(e));
+    } finally {
+      setLoadingCaja(false);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,11 +85,46 @@ export default function VentaPage() {
 
   useEffect(() => {
     load();
+    loadCaja();
     api<{ id: number; nombre: string; logoUrl?: string }>("/api/tienda").then(setTienda).catch(() => {});
     api<{ id: number; nombre: string }[]>("/api/proveedores")
       .then((rows) => setProveedores(rows.map((p) => ({ id: p.id, nombre: p.nombre }))))
       .catch(() => {});
-  }, [load]);
+  }, [load, loadCaja]);
+
+  const cajaAbierta = caja?.sesionAbierta ?? false;
+
+  const abrirCaja = async () => {
+    setCajaBusy(true);
+    setMsg(null);
+    try {
+      await api("/api/caja/abrir", { method: "POST" });
+      await loadCaja();
+      setMsg("Caja abierta. Ya puede registrar ventas.");
+    } catch (e) {
+      setMsg(String(e));
+    } finally {
+      setCajaBusy(false);
+    }
+  };
+
+  const cerrarCaja = async () => {
+    if (cart.length > 0) {
+      setMsg("Vacíe el carrito antes de cerrar la caja.");
+      return;
+    }
+    setCajaBusy(true);
+    setMsg(null);
+    try {
+      await api("/api/caja/cerrar", { method: "POST" });
+      await loadCaja();
+      setMsg("Caja cerrada.");
+    } catch (e) {
+      setMsg(String(e));
+    } finally {
+      setCajaBusy(false);
+    }
+  };
 
   const disponiblesFiltrados = useMemo(() => {
     let list = disponibles;
@@ -86,6 +144,10 @@ export default function VentaPage() {
   }, [disponibles, filtroTexto, filtroId, filtroProveedor]);
 
   const addToCart = (p: Producto) => {
+    if (!cajaAbierta) {
+      setMsg("Debe abrir la caja antes de vender.");
+      return;
+    }
     setCart((c) => [...c, p]);
     setDisponibles((d) => d.filter((x) => x.id !== p.id));
   };
@@ -137,6 +199,10 @@ export default function VentaPage() {
 
   const confirmarVenta = async () => {
     if (cart.length === 0) return;
+    if (!cajaAbierta) {
+      setMsg("Debe abrir la caja antes de registrar ventas.");
+      return;
+    }
     setSaving(true);
     setMsg(null);
     const snapshot = cart.map((p) => ({
@@ -168,6 +234,7 @@ export default function VentaPage() {
       setLastTicket(ticket);
       setCart([]);
       await load();
+      await loadCaja();
       setMsg("Venta registrada correctamente.");
       window.setTimeout(() => printTicket(ticket), 300);
     } catch (e) {
@@ -177,8 +244,91 @@ export default function VentaPage() {
     }
   };
 
+  const fechaHoy = new Date().toLocaleDateString("es-AR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
   return (
-    <div className="page venta-grid">
+    <div className="page venta-page">
+      <section className="card caja-panel">
+        <div className="caja-header">
+          <div>
+            <h2>Ventas diarias</h2>
+            <p className="muted caja-fecha">{fechaHoy}</p>
+          </div>
+          <div className="caja-header-actions">
+            <span className={`caja-badge ${cajaAbierta ? "caja-badge-open" : "caja-badge-closed"}`}>
+              {cajaAbierta ? "Caja abierta" : "Caja cerrada"}
+            </span>
+            {cajaAbierta ? (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={cajaBusy}
+                onClick={cerrarCaja}
+              >
+                {cajaBusy ? "Cerrando" + ELLIPSIS : "Cerrar caja"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={cajaBusy}
+                onClick={abrirCaja}
+              >
+                {cajaBusy ? "Abriendo" + ELLIPSIS : "Abrir caja"}
+              </button>
+            )}
+          </div>
+        </div>
+        <p className="total caja-total-dia">
+          <strong>Total del día: ${(caja?.totalDia ?? 0).toFixed(2)}</strong>
+          {caja && caja.ventas.length > 0 ? (
+            <span className="muted"> · {caja.ventas.length} venta{caja.ventas.length === 1 ? "" : "s"}</span>
+          ) : null}
+        </p>
+        {loadingCaja ? (
+          <p>{"Cargando ventas del día" + ELLIPSIS}</p>
+        ) : caja && caja.ventas.length > 0 ? (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Venta</th>
+                  <th>Hora</th>
+                  <th>Artículos</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {caja.ventas.map((v) => (
+                  <tr key={v.id}>
+                    <td>#{v.id}</td>
+                    <td>
+                      {new Date(v.fecha).toLocaleTimeString("es-AR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </td>
+                    <td>{v.cantidadItems}</td>
+                    <td>${v.total.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="muted">Aún no hay ventas registradas hoy.</p>
+        )}
+        {!cajaAbierta && (
+          <p className="caja-aviso">Abrí la caja para poder agregar productos al carrito y confirmar ventas.</p>
+        )}
+      </section>
+
+      <div className="venta-grid">
       <section className="card">
         <h2>Prendas disponibles</h2>
         <div className="form-grid" style={{ gridTemplateColumns: "1fr 180px 220px", gap: "0.5rem", marginBottom: "0.5rem" }}>
@@ -242,7 +392,12 @@ export default function VentaPage() {
                     <td>${p.precioVenta.toFixed(2)}</td>
                     <td>{p.nombreProveedor ?? EM}</td>
                     <td>
-                      <button type="button" className="btn btn-primary" onClick={() => addToCart(p)}>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        disabled={!cajaAbierta}
+                        onClick={() => addToCart(p)}
+                      >
                         Al carrito
                       </button>
                     </td>
@@ -291,7 +446,7 @@ export default function VentaPage() {
           <button
             type="button"
             className="btn btn-accent"
-            disabled={cart.length === 0 || saving}
+            disabled={!cajaAbierta || cart.length === 0 || saving}
             onClick={confirmarVenta}
           >
             {saving ? "Guardando" + ELLIPSIS : "Confirmar venta"}
@@ -302,13 +457,24 @@ export default function VentaPage() {
             </button>
           )}
         </div>
-        {msg && <p className={msg.includes("correctamente") ? "ok" : "err"}>{msg}</p>}
+        {msg && (
+          <p
+            className={
+              msg.includes("correctamente") || msg.includes("abierta") || msg.includes("cerrada")
+                ? "ok"
+                : "err"
+            }
+          >
+            {msg}
+          </p>
+        )}
         {lastTicket && (
           <p className="muted" style={{ marginTop: "0.75rem", fontSize: "0.9rem" }}>
             Ticket de venta #{lastTicket.ventaId} disponible para imprimir.
           </p>
         )}
       </section>
+      </div>
     </div>
   );
 }

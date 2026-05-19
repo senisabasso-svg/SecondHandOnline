@@ -153,10 +153,26 @@ app.post("/api/super/usuarios", authOptional, requireAuth, requireSuperadmin, as
 app.use("/api/proveedores", authOptional, requireAuth, requireTenant);
 app.use("/api/productos", authOptional, requireAuth, requireTenant);
 app.use("/api/ventas", authOptional, requireAuth, requireTenant);
+app.use("/api/caja", authOptional, requireAuth, requireTenant);
 app.use("/api/informes", authOptional, requireAuth, requireTenant);
 app.use("/api/menu-precios", authOptional, requireAuth, requireTenant);
 
 const tw = (req) => ({ idSecond: req.user.idSecond });
+
+function dayBounds(d = new Date()) {
+  const start = new Date(d);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(d);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
+
+async function getCajaAbierta(idSecond) {
+  return prisma.cajaSesion.findFirst({
+    where: { idSecond, cerradaEn: null },
+    orderBy: { abiertaEn: "desc" },
+  });
+}
 
 app.get("/api/proveedores", async (req, res) => {
   try {
@@ -318,6 +334,77 @@ app.put("/api/productos/:id", async (req, res) => {
     res.status(500).json({ error: String(e.message) });
   }
 });
+app.get("/api/caja/diario", async (req, res) => {
+  try {
+    const idSecond = req.user.idSecond;
+    const { start, end } = dayBounds();
+    const sesionAbierta = await getCajaAbierta(idSecond);
+    const ventas = await prisma.venta.findMany({
+      where: { idSecond, fecha: { gte: start, lte: end } },
+      orderBy: { fecha: "desc" },
+      include: { _count: { select: { items: true } } },
+    });
+    const totalDia = ventas.reduce((s, v) => s + v.total, 0);
+    res.json({
+      sesionAbierta: Boolean(sesionAbierta),
+      sesion: sesionAbierta
+        ? { id: sesionAbierta.id, abiertaEn: sesionAbierta.abiertaEn, cerradaEn: sesionAbierta.cerradaEn }
+        : null,
+      ventas: ventas.map((v) => ({
+        id: v.id,
+        fecha: v.fecha,
+        total: v.total,
+        cantidadItems: v._count.items,
+      })),
+      totalDia,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.post("/api/caja/abrir", async (req, res) => {
+  try {
+    const idSecond = req.user.idSecond;
+    const abierta = await getCajaAbierta(idSecond);
+    if (abierta) {
+      return res.status(400).json({ error: "La caja ya está abierta." });
+    }
+    const sesion = await prisma.cajaSesion.create({ data: { idSecond } });
+    res.status(201).json({
+      id: sesion.id,
+      abiertaEn: sesion.abiertaEn,
+      cerradaEn: sesion.cerradaEn,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.post("/api/caja/cerrar", async (req, res) => {
+  try {
+    const idSecond = req.user.idSecond;
+    const abierta = await getCajaAbierta(idSecond);
+    if (!abierta) {
+      return res.status(400).json({ error: "No hay caja abierta para cerrar." });
+    }
+    const sesion = await prisma.cajaSesion.update({
+      where: { id: abierta.id },
+      data: { cerradaEn: new Date() },
+    });
+    res.json({
+      id: sesion.id,
+      abiertaEn: sesion.abiertaEn,
+      cerradaEn: sesion.cerradaEn,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
 app.post("/api/ventas", async (req, res) => {
   const { items } = req.body;
   if (!Array.isArray(items) || items.length === 0) {
@@ -325,6 +412,10 @@ app.post("/api/ventas", async (req, res) => {
   }
   const idSecond = req.user.idSecond;
   try {
+    const caja = await getCajaAbierta(idSecond);
+    if (!caja) {
+      return res.status(403).json({ error: "Debe abrir la caja antes de registrar ventas." });
+    }
     const ids = items.map((i) => Number(i.idProducto));
     const productos = await prisma.producto.findMany({ where: { id: { in: ids }, idSecond, estado: "disponible" } });
     if (productos.length !== ids.length) {
@@ -332,7 +423,7 @@ app.post("/api/ventas", async (req, res) => {
     }
     const total = items.reduce((s, i) => s + Number(i.precioUnitario || 0), 0);
     const result = await prisma.$transaction(async (tx) => {
-      const venta = await tx.venta.create({ data: { total, idSecond } });
+      const venta = await tx.venta.create({ data: { total, idSecond, idCaja: caja.id } });
       for (const it of items) {
         await tx.ventaItem.create({
           data: {

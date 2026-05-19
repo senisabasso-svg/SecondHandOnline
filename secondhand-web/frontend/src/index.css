@@ -103,6 +103,70 @@ body {
   margin-top: 1.5rem;
 }
 
+.venta-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.caja-panel h2 {
+  margin: 0;
+}
+
+.caja-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.caja-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.caja-fecha {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  text-transform: capitalize;
+}
+
+.caja-badge {
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.caja-badge-open {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.caja-badge-closed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.caja-total-dia {
+  margin: 0 0 0.5rem;
+}
+
+.caja-aviso {
+  margin: 1rem 0 0;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 0.9rem;
+}
+
 .venta-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

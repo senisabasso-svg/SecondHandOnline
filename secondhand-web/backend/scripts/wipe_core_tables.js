@@ -9,6 +9,7 @@ async function main() {
   // Borrado en orden por dependencias
   await prisma.ventaItem.deleteMany({});
   await prisma.venta.deleteMany({});
+  await prisma.cajaSesion.deleteMany({});
   await prisma.producto.deleteMany({});
   await prisma.proveedor.deleteMany({});
   console.log("Tablas limpiadas: venta_items, ventas, productos, proveedores");
