@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { EM, ELLIPSIS, T } from "../lib/uiText";
 import type { Producto } from "./VentaPage";
@@ -11,6 +11,7 @@ export default function ProductosPage() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
   const [editId, setEditId] = useState<number | null>(null);
+  const [filtroProveedor, setFiltroProveedor] = useState("");
   const [form, setForm] = useState({
     descripcion: "",
     tipoPrenda: "",
@@ -52,6 +53,12 @@ export default function ProductosPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const productosFiltrados = useMemo(() => {
+    const provNum = Number(filtroProveedor);
+    if (Number.isNaN(provNum) || filtroProveedor === "") return productos;
+    return productos.filter((p) => p.idProveedor === provNum);
+  }, [productos, filtroProveedor]);
 
   const startEdit = (p: Producto) => {
     setEditId(p.id);
@@ -262,6 +269,19 @@ export default function ProductosPage() {
 
       <section className="card mt-lg">
         <h2>Listado de productos</h2>
+        <div className="filter-row">
+          <label>
+            <span className="muted">Filtrar por proveedor</span>
+            <select value={filtroProveedor} onChange={(e) => setFiltroProveedor(e.target.value)}>
+              <option value="">Todos</option>
+              {proveedores.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         {loading ? (
           <p>{"Cargando" + ELLIPSIS}</p>
         ) : (
@@ -282,7 +302,7 @@ export default function ProductosPage() {
                 </tr>
               </thead>
               <tbody>
-                {productos.map((p) => (
+                {productosFiltrados.map((p) => (
                   <tr key={p.id}>
                     <td>{p.id}</td>
                     <td>{p.descripcion}</td>
