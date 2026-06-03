@@ -8,6 +8,8 @@ import ProveedoresPage from "./pages/ProveedoresPage";
 import InformesPage from "./pages/InformesPage";
 import LoginPage from "./pages/LoginPage";
 import SuperadminPage from "./pages/SuperadminPage";
+import ProveedorLoginPage from "./pages/ProveedorLoginPage";
+import ProveedorPortalPage from "./pages/ProveedorPortalPage";
 
 function TenantLayout() {
   const { usuario, logout } = useAuth();
@@ -74,6 +76,7 @@ function RequireTenant() {
     );
   }
   if (!usuario) return <Navigate to="/login" replace />;
+  if (usuario.rol === "proveedor") return <Navigate to="/proveedor" replace />;
   if (usuario.rol === "superadmin") {
     return <Navigate to="/super" replace />;
   }
@@ -92,9 +95,32 @@ function LoginRoute() {
   const { usuario, loading } = useAuth();
   if (loading) return <p className="muted">Cargando...</p>;
   if (usuario) {
+    if (usuario.rol === "proveedor") return <Navigate to="/proveedor" replace />;
     return <Navigate to={usuario.rol === "superadmin" ? "/super" : "/"} replace />;
   }
   return <LoginPage />;
+}
+
+function ProveedorLoginRoute() {
+  const { usuario, loading } = useAuth();
+  if (loading) return <p className="muted">Cargando...</p>;
+  if (usuario?.rol === "proveedor") return <Navigate to="/proveedor" replace />;
+  if (usuario) return <Navigate to={usuario.rol === "superadmin" ? "/super" : "/"} replace />;
+  return <ProveedorLoginPage />;
+}
+
+function RequireProveedor() {
+  const { usuario, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="main">
+        <p className="muted">Cargando...</p>
+      </div>
+    );
+  }
+  if (!usuario) return <Navigate to="/ingreso-proveedores" replace />;
+  if (usuario.rol !== "proveedor") return <Navigate to="/" replace />;
+  return <Outlet />;
 }
 
 function SuperadminRoute() {
@@ -109,7 +135,12 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginRoute />} />
+      <Route path="/ingreso-proveedores" element={<ProveedorLoginRoute />} />
       <Route path="/super" element={<SuperadminRoute />} />
+
+      <Route element={<RequireProveedor />}>
+        <Route path="/proveedor" element={<ProveedorPortalPage />} />
+      </Route>
 
       <Route element={<RequireTenant />}>
         <Route element={<TenantLayout />}>

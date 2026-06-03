@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useEffect } from "react";
 import { api } from "../api";
@@ -79,6 +79,10 @@ export default function LoginPage() {
           </button>
         </form>
         {error && <p className="err">{error}</p>}
+        <p className="muted" style={{ marginTop: "1rem", fontSize: "0.9rem" }}>
+          <Link to="/ingreso-proveedores">Ingreso proveedores</Link>
+          {" · usuario: NombreTienda+NombreProveedor"}
+        </p>
       </section>
     </div>
   );

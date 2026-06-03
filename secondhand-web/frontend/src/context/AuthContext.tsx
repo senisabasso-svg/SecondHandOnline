@@ -14,7 +14,7 @@ const USER_KEY = "sh_user";
 
 export type Usuario = {
   id: number;
-  email: string;
+  email: string | null;
   nombre: string | null;
   rol: string;
   idSecond: number | null;
@@ -25,6 +25,7 @@ type AuthState = {
   usuario: Usuario | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginProveedor: (usuario: string, password: string) => Promise<void>;
   logout: () => void;
   setSession: (token: string, usuario: Usuario) => void;
 };
@@ -95,6 +96,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [setSession]
   );
 
+  const loginProveedor = useCallback(
+    async (usuario: string, password: string) => {
+      const base = getApiBase();
+      const url = base ? `${base}/api/auth/proveedor/login` : "/api/auth/proveedor/login";
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ usuario, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error((data as { error?: string }).error || "Error al iniciar sesión");
+      }
+      const { token: tok, usuario: usr } = data as { token: string; usuario: Usuario };
+      setSession(tok, usr);
+    },
+    [setSession]
+  );
+
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
@@ -103,8 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ token, usuario, loading, login, logout, setSession }),
-    [token, usuario, loading, login, logout, setSession]
+    () => ({ token, usuario, loading, login, loginProveedor, logout, setSession }),
+    [token, usuario, loading, login, loginProveedor, logout, setSession]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

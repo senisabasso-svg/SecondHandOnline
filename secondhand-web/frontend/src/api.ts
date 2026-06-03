@@ -22,9 +22,22 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { ...authHeaders(), ...init?.headers },
   });
   if (res.status === 401) {
+    const wasProveedor =
+      (() => {
+        try {
+          const raw = localStorage.getItem("sh_user");
+          return raw ? (JSON.parse(raw) as { rol?: string }).rol === "proveedor" : false;
+        } catch {
+          return false;
+        }
+      })();
     localStorage.removeItem("sh_token");
     localStorage.removeItem("sh_user");
-    if (!path.includes("/auth/login")) window.location.assign("/login");
+    const isAuthAttempt =
+      path.includes("/auth/login") || path.includes("/auth/proveedor/login");
+    if (!isAuthAttempt) {
+      window.location.assign(wasProveedor ? "/ingreso-proveedores" : "/login");
+    }
     throw new Error("Sesi\u00f3n caducada o no autorizado.");
   }
   if (!res.ok) {

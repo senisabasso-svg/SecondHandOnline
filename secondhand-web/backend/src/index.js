@@ -39,6 +39,31 @@ function requireSuperadmin(req, res, next) {
   next();
 }
 
+function requireProveedor(req, res, next) {
+  if (req.user?.rol !== "proveedor") return res.status(403).json({ error: "Acceso solo para proveedores." });
+  if (req.user.idSecond == null) return res.status(403).json({ error: "Sesión de proveedor inválida." });
+  next();
+}
+
+function normalizeNombre(s) {
+  return String(s || "").trim();
+}
+
+function nombresCoinciden(a, b) {
+  return normalizeNombre(a).localeCompare(normalizeNombre(b), undefined, { sensitivity: "accent" }) === 0;
+}
+
+/** Formato: nombreTienda+nombreProveedor (un solo + como separador) */
+function parseCredencialProveedor(credencial) {
+  const raw = normalizeNombre(credencial);
+  const idx = raw.indexOf("+");
+  if (idx <= 0 || idx === raw.length - 1) return null;
+  const nombreTienda = raw.slice(0, idx).trim();
+  const nombreProveedor = raw.slice(idx + 1).trim();
+  if (!nombreTienda || !nombreProveedor) return null;
+  return { nombreTienda, nombreProveedor };
+}
+
 app.get("/health", (_, res) => res.json({ ok: true }));
 
 // Detalles de la tienda del usuario autenticado
@@ -72,14 +97,142 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
+app.get("/api/public/tiendas", async (_, res) => {
+  try {
+    const rows = await prisma.secondHand.findMany({
+      where: { activo: true },
+      select: { id: true, nombre: true, logoUrl: true },
+      orderBy: { nombre: "asc" },
+    });
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.post("/api/auth/proveedor/login", async (req, res) => {
+  try {
+    const { usuario, password, nombre } = req.body;
+    const credencial = usuario ?? nombre;
+    const credencialNorm = normalizeNombre(credencial);
+    if (!credencialNorm || !password) {
+      return res.status(400).json({ error: "Usuario y clave son obligatorios." });
+    }
+    if (!nombresCoinciden(credencialNorm, password)) {
+      return res.status(401).json({ error: "Credenciales incorrectas." });
+    }
+    const partes = parseCredencialProveedor(credencialNorm);
+    if (!partes) {
+      return res.status(400).json({
+        error: "Use el formato NombreTienda+NombreProveedor (ejemplo: MiTienda+María).",
+      });
+    }
+    const tienda = await prisma.secondHand.findFirst({
+      where: { activo: true, nombre: { equals: partes.nombreTienda, mode: "insensitive" } },
+    });
+    if (!tienda) return res.status(401).json({ error: "Credenciales incorrectas." });
+    const candidatos = await prisma.proveedor.findMany({
+      where: {
+        idSecond: tienda.id,
+        nombre: { equals: partes.nombreProveedor, mode: "insensitive" },
+      },
+    });
+    if (candidatos.length === 0) {
+      return res.status(401).json({ error: "Credenciales incorrectas." });
+    }
+    const prov = candidatos[0];
+    res.json({
+      token: signToken({ id: prov.id, rol: "proveedor", idSecond: prov.idSecond }),
+      usuario: {
+        id: prov.id,
+        email: null,
+        nombre: prov.nombre,
+        rol: "proveedor",
+        idSecond: prov.idSecond,
+      },
+      tienda: { id: tienda.id, nombre: tienda.nombre, logoUrl: tienda.logoUrl },
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
 app.get("/api/auth/me", authOptional, requireAuth, async (req, res) => {
   try {
+    if (req.user.rol === "proveedor") {
+      const p = await prisma.proveedor.findFirst({
+        where: { id: req.user.sub, idSecond: req.user.idSecond },
+        select: { id: true, nombre: true, idSecond: true },
+      });
+      if (!p) return res.status(404).json({ error: "Proveedor no encontrado." });
+      return res.json({
+        id: p.id,
+        email: null,
+        nombre: p.nombre,
+        rol: "proveedor",
+        idSecond: p.idSecond,
+      });
+    }
     const u = await prisma.usuario.findUnique({
       where: { id: req.user.sub },
       select: { id: true, email: true, nombre: true, rol: true, idSecond: true },
     });
     if (!u) return res.status(404).json({ error: "Usuario no encontrado." });
     res.json(u);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.get("/api/proveedor/tienda", authOptional, requireAuth, requireProveedor, async (req, res) => {
+  try {
+    const sh = await prisma.secondHand.findUnique({
+      where: { id: req.user.idSecond },
+      select: { id: true, nombre: true, logoUrl: true },
+    });
+    if (!sh) return res.status(404).json({ error: "Tienda no encontrada." });
+    res.json(sh);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.get("/api/proveedor/mis-prendas", authOptional, requireAuth, requireProveedor, async (req, res) => {
+  try {
+    const rows = await prisma.producto.findMany({
+      where: { idSecond: req.user.idSecond, idProveedor: req.user.sub },
+      orderBy: { id: "desc" },
+      include: {
+        ventaItems: {
+          orderBy: { id: "desc" },
+          take: 1,
+          include: { venta: { select: { fecha: true } } },
+        },
+      },
+    });
+    res.json(
+      rows.map((p) => {
+        const vi = p.ventaItems[0];
+        const vendido = p.estado === "vendido";
+        return {
+          id: p.id,
+          descripcion: p.descripcion,
+          tipoPrenda: p.tipoPrenda,
+          marca: p.marca,
+          color: p.color,
+          talle: p.talle,
+          precioVenta: p.precioVenta,
+          estado: p.estado,
+          vendido,
+          fechaVenta: vendido && vi?.venta?.fecha ? vi.venta.fecha : null,
+          precioVendido: vendido && vi ? vi.precioUnitario : null,
+        };
+      })
+    );
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: String(e.message) });
