@@ -390,8 +390,6 @@ tr:hover td {
 .login-logo-video {
   width: 88px;
   height: 88px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--border);
-  box-shadow: 0 4px 14px rgba(219, 39, 119, 0.15);
+  object-fit: contain;
+  display: block;
 }
