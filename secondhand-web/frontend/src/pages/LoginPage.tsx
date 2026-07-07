@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
@@ -76,10 +76,6 @@ export default function LoginPage() {
           </button>
         </form>
         {error && <p className="err">{error}</p>}
-        <p className="muted" style={{ marginTop: "1rem", fontSize: "0.9rem", textAlign: "center" }}>
-          <Link to="/ingreso-proveedores">Ingreso proveedores</Link>
-          {" · usuario: NombreTienda+NombreProveedor"}
-        </p>
       </section>
     </div>
   );
