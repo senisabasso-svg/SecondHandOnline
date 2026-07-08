@@ -26,6 +26,21 @@ type Informe = {
 
 type Proveedor = { id: number; nombre: string; telefono?: string | null };
 
+type MovimientoCaja = {
+  id: number;
+  fecha: string;
+  tipo: "ingreso" | "egreso";
+  monto: number;
+  concepto: string | null;
+};
+
+type InformeMovimientosCaja = {
+  movimientos: MovimientoCaja[];
+  totalIngresos: number;
+  totalEgresos: number;
+  neto: number;
+};
+
 function normalizePhoneForWhatsApp(raw?: string | null) {
   if (!raw) return "";
   let digits = raw.replace(/\D+/g, "");
@@ -54,6 +69,7 @@ export default function InformesPage() {
   const [filtro, setFiltro] = useState<string>("");
   const [mes, setMes] = useState<string>("");
   const [totalProv, setTotalProv] = useState<number | null>(null);
+  const [movimientosCaja, setMovimientosCaja] = useState<InformeMovimientosCaja | null>(null);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -71,17 +87,24 @@ export default function InformesPage() {
     try {
       const id = filtro ? Number(filtro) : null;
       const qs = mes ? `?month=${encodeURIComponent(mes)}` : "";
+      const movQs = mes ? `?month=${encodeURIComponent(mes)}` : "";
       if (id) {
-        const [rows, tot] = await Promise.all([
+        const [rows, tot, mov] = await Promise.all([
           api<Informe[]>(`/api/informes/proveedor/${id}${qs}`),
           api<{ total: number }>(`/api/informes/proveedor/${id}/total${qs}`),
+          api<InformeMovimientosCaja>(`/api/informes/movimientos-caja${movQs}`),
         ]);
         setInformes(rows);
         setTotalProv(tot.total);
+        setMovimientosCaja(mov);
       } else {
-        const rows = await api<Informe[]>(`/api/informes${qs}`);
+        const [rows, mov] = await Promise.all([
+          api<Informe[]>(`/api/informes${qs}`),
+          api<InformeMovimientosCaja>(`/api/informes/movimientos-caja${movQs}`),
+        ]);
         setInformes(rows);
         setTotalProv(null);
+        setMovimientosCaja(mov);
       }
     } catch (e) {
       setMsg(String(e));
@@ -249,6 +272,55 @@ export default function InformesPage() {
           </div>
         )}
         {msg && !loading && <p className="err">{msg}</p>}
+      </section>
+
+      <section className="card">
+        <h2>Movimientos de efectivo en caja</h2>
+        <p className="muted">
+          Ingresos y egresos registrados desde la caja
+          {mes ? ` (${mes})` : ""}.
+        </p>
+        {movimientosCaja && (
+          <p className="total-inline" style={{ marginBottom: "1rem" }}>
+            <strong>
+              Ingresos: ${movimientosCaja.totalIngresos.toFixed(2)} · Egresos: $
+              {movimientosCaja.totalEgresos.toFixed(2)} · Neto: ${movimientosCaja.neto.toFixed(2)}
+            </strong>
+          </p>
+        )}
+        {loading ? (
+          <p>{"Cargando" + ELLIPSIS}</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Tipo</th>
+                  <th>Concepto</th>
+                  <th>Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(movimientosCaja?.movimientos ?? []).map((m) => (
+                  <tr key={m.id}>
+                    <td>{new Date(m.fecha).toLocaleString("es")}</td>
+                    <td className={m.tipo === "ingreso" ? "caja-mov-ingreso" : "caja-mov-egreso"}>
+                      {m.tipo === "ingreso" ? "Ingreso" : "Egreso"}
+                    </td>
+                    <td>{m.concepto ?? EM}</td>
+                    <td>
+                      {m.tipo === "egreso" ? "−" : "+"}${m.monto.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {(movimientosCaja?.movimientos.length ?? 0) === 0 && (
+              <p className="muted">No hay movimientos de caja en este período.</p>
+            )}
+          </div>
+        )}
       </section>
     </div>
   );

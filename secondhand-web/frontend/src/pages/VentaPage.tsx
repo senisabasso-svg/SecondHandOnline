@@ -44,11 +44,25 @@ function labelMedioPago(m?: string | null) {
   return EM;
 }
 
+type CajaMovimiento = {
+  id: number;
+  fecha: string;
+  tipo: "ingreso" | "egreso";
+  monto: number;
+  concepto: string | null;
+};
+
 type CajaDiario = {
   sesionAbierta: boolean;
   sesion: { id: number; abiertaEn: string; cerradaEn: string | null } | null;
   ventas: VentaDiaria[];
+  movimientos: CajaMovimiento[];
   totalDia: number;
+  totalEfectivo: number;
+  totalTarjeta: number;
+  totalIngresos: number;
+  totalEgresos: number;
+  efectivoEnCaja: number;
 };
 
 function escapeHtml(s: string) {
@@ -75,6 +89,8 @@ export default function VentaPage() {
   const [loadingCaja, setLoadingCaja] = useState(true);
   const [cajaBusy, setCajaBusy] = useState(false);
   const [verVentas, setVerVentas] = useState(false);
+  const [verMovimientos, setVerMovimientos] = useState(false);
+  const [movForm, setMovForm] = useState({ tipo: "egreso" as "ingreso" | "egreso", monto: "", concepto: "" });
   const [modalPago, setModalPago] = useState(false);
 
   const loadCaja = useCallback(async () => {
@@ -138,6 +154,38 @@ export default function VentaPage() {
       setMsg("Caja cerrada.");
     } catch (e) {
       setMsg(String(e));
+    } finally {
+      setCajaBusy(false);
+    }
+  };
+
+  const registrarMovimiento = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cajaAbierta) {
+      setMsg("Debe abrir la caja antes de registrar movimientos.");
+      return;
+    }
+    const importe = Number(movForm.monto);
+    if (!Number.isFinite(importe) || importe <= 0) {
+      setMsg("Ingrese un monto válido mayor a cero.");
+      return;
+    }
+    setCajaBusy(true);
+    setMsg(null);
+    try {
+      await api("/api/caja/movimientos", {
+        method: "POST",
+        body: JSON.stringify({
+          tipo: movForm.tipo,
+          monto: importe,
+          concepto: movForm.concepto.trim() || null,
+        }),
+      });
+      setMovForm({ tipo: movForm.tipo, monto: "", concepto: "" });
+      await loadCaja();
+      setMsg(movForm.tipo === "ingreso" ? "Ingreso registrado." : "Egreso registrado.");
+    } catch (err) {
+      setMsg(String(err));
     } finally {
       setCajaBusy(false);
     }
@@ -329,6 +377,107 @@ export default function VentaPage() {
             <span className="muted"> · Sin ventas hoy</span>
           )}
         </p>
+        {!loadingCaja && caja && (
+          <div className="caja-resumen-efectivo">
+            <span>Efectivo en caja: <strong>${caja.efectivoEnCaja.toFixed(2)}</strong></span>
+            <span className="muted">
+              {" "}
+              (ventas efectivo ${caja.totalEfectivo.toFixed(2)}
+              {caja.totalIngresos > 0 ? ` + ingresos $${caja.totalIngresos.toFixed(2)}` : ""}
+              {caja.totalEgresos > 0 ? ` − egresos $${caja.totalEgresos.toFixed(2)}` : ""}
+              {caja.totalTarjeta > 0 ? ` · tarjeta $${caja.totalTarjeta.toFixed(2)}` : ""})
+            </span>
+          </div>
+        )}
+        <div className="caja-movimientos">
+          <h3 className="caja-movimientos-titulo">Ingresos y egresos de efectivo</h3>
+          <p className="muted caja-movimientos-desc">
+            Registre pagos a proveedores u otros retiros de caja, o ingresos de efectivo.
+          </p>
+          <form className="caja-mov-form" onSubmit={registrarMovimiento}>
+            <label>
+              Tipo
+              <select
+                value={movForm.tipo}
+                onChange={(e) => setMovForm((f) => ({ ...f, tipo: e.target.value as "ingreso" | "egreso" }))}
+                disabled={!cajaAbierta || cajaBusy}
+              >
+                <option value="egreso">Egreso (sale de caja)</option>
+                <option value="ingreso">Ingreso (entra a caja)</option>
+              </select>
+            </label>
+            <label>
+              Monto
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={movForm.monto}
+                onChange={(e) => setMovForm((f) => ({ ...f, monto: e.target.value }))}
+                placeholder="0.00"
+                disabled={!cajaAbierta || cajaBusy}
+                required
+              />
+            </label>
+            <label className="caja-mov-concepto">
+              Concepto
+              <input
+                type="text"
+                value={movForm.concepto}
+                onChange={(e) => setMovForm((f) => ({ ...f, concepto: e.target.value }))}
+                placeholder="Ej: Pago proveedor María"
+                disabled={!cajaAbierta || cajaBusy}
+              />
+            </label>
+            <button type="submit" className="btn btn-secondary" disabled={!cajaAbierta || cajaBusy}>
+              Registrar
+            </button>
+          </form>
+          {!loadingCaja && caja && caja.movimientos.length > 0 && (
+            <>
+              <button
+                type="button"
+                className="btn btn-ghost caja-ver-mov-btn"
+                onClick={() => setVerMovimientos((v) => !v)}
+              >
+                {verMovimientos ? "Ocultar movimientos" : "Ver movimientos del día"}
+              </button>
+              {verMovimientos && (
+                <div className="table-wrap caja-ventas-detalle">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Hora</th>
+                        <th>Tipo</th>
+                        <th>Concepto</th>
+                        <th>Monto</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {caja.movimientos.map((m) => (
+                        <tr key={m.id}>
+                          <td>
+                            {new Date(m.fecha).toLocaleTimeString("es-AR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </td>
+                          <td className={m.tipo === "ingreso" ? "caja-mov-ingreso" : "caja-mov-egreso"}>
+                            {m.tipo === "ingreso" ? "Ingreso" : "Egreso"}
+                          </td>
+                          <td>{m.concepto || EM}</td>
+                          <td>
+                            {m.tipo === "egreso" ? "−" : "+"}${m.monto.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
         {verVentas && caja && caja.ventas.length > 0 && (
           <div className="table-wrap caja-ventas-detalle">
             <table>

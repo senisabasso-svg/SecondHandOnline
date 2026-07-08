@@ -313,6 +313,7 @@ app.use("/api/menu-precios", authOptional, requireAuth, requireTenant);
 const tw = (req) => ({ idSecond: req.user.idSecond });
 
 const MEDIOS_PAGO = new Set(["efectivo", "tarjeta"]);
+const TIPOS_MOVIMIENTO_CAJA = new Set(["ingreso", "egreso"]);
 
 function dayBounds(d = new Date()) {
   const start = new Date(d);
@@ -499,7 +500,24 @@ app.get("/api/caja/diario", async (req, res) => {
       orderBy: { fecha: "desc" },
       include: { _count: { select: { items: true } } },
     });
+    const movimientos = await prisma.cajaMovimiento.findMany({
+      where: { idSecond, fecha: { gte: start, lte: end } },
+      orderBy: { fecha: "desc" },
+    });
     const totalDia = ventas.reduce((s, v) => s + v.total, 0);
+    const totalEfectivo = ventas
+      .filter((v) => v.medioPago === "efectivo")
+      .reduce((s, v) => s + v.total, 0);
+    const totalTarjeta = ventas
+      .filter((v) => v.medioPago === "tarjeta")
+      .reduce((s, v) => s + v.total, 0);
+    const totalIngresos = movimientos
+      .filter((m) => m.tipo === "ingreso")
+      .reduce((s, m) => s + m.monto, 0);
+    const totalEgresos = movimientos
+      .filter((m) => m.tipo === "egreso")
+      .reduce((s, m) => s + m.monto, 0);
+    const efectivoEnCaja = totalEfectivo + totalIngresos - totalEgresos;
     res.json({
       sesionAbierta: Boolean(sesionAbierta),
       sesion: sesionAbierta
@@ -512,7 +530,57 @@ app.get("/api/caja/diario", async (req, res) => {
         cantidadItems: v._count.items,
         medioPago: v.medioPago,
       })),
+      movimientos: movimientos.map((m) => ({
+        id: m.id,
+        fecha: m.fecha,
+        tipo: m.tipo,
+        monto: m.monto,
+        concepto: m.concepto,
+      })),
       totalDia,
+      totalEfectivo,
+      totalTarjeta,
+      totalIngresos,
+      totalEgresos,
+      efectivoEnCaja,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.post("/api/caja/movimientos", async (req, res) => {
+  try {
+    const idSecond = req.user.idSecond;
+    const { tipo, monto, concepto } = req.body;
+    const tipoNorm = typeof tipo === "string" ? tipo.trim().toLowerCase() : "";
+    if (!TIPOS_MOVIMIENTO_CAJA.has(tipoNorm)) {
+      return res.status(400).json({ error: "Tipo inválido. Use ingreso o egreso." });
+    }
+    const importe = Number(monto);
+    if (!Number.isFinite(importe) || importe <= 0) {
+      return res.status(400).json({ error: "El monto debe ser mayor a cero." });
+    }
+    const caja = await getCajaAbierta(idSecond);
+    if (!caja) {
+      return res.status(403).json({ error: "Debe abrir la caja antes de registrar movimientos." });
+    }
+    const row = await prisma.cajaMovimiento.create({
+      data: {
+        idSecond,
+        idCaja: caja.id,
+        tipo: tipoNorm,
+        monto: importe,
+        concepto: concepto?.trim() || null,
+      },
+    });
+    res.status(201).json({
+      id: row.id,
+      fecha: row.fecha,
+      tipo: row.tipo,
+      monto: row.monto,
+      concepto: row.concepto,
     });
   } catch (e) {
     console.error(e);
@@ -602,6 +670,47 @@ app.post("/api/ventas", async (req, res) => {
       total: result.total,
       fecha: result.fecha,
       medioPago: result.medioPago,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.get("/api/informes/movimientos-caja", async (req, res) => {
+  try {
+    const { month, from, to } = req.query;
+    let fechaWhere = {};
+    if (month && typeof month === "string" && /^\d{4}-\d{2}$/.test(month)) {
+      const start = new Date(`${month}-01T00:00:00.000Z`);
+      const end = new Date(new Date(start).setMonth(start.getMonth() + 1));
+      fechaWhere = { gte: start, lt: end };
+    } else if (from || to) {
+      const gte = from ? new Date(String(from)) : undefined;
+      const lt = to ? new Date(String(to)) : undefined;
+      fechaWhere = { ...(gte ? { gte } : {}), ...(lt ? { lt } : {}) };
+    }
+    const where = {
+      idSecond: req.user.idSecond,
+      ...(Object.keys(fechaWhere).length ? { fecha: fechaWhere } : {}),
+    };
+    const rows = await prisma.cajaMovimiento.findMany({
+      where,
+      orderBy: { fecha: "desc" },
+    });
+    const totalIngresos = rows.filter((r) => r.tipo === "ingreso").reduce((s, r) => s + r.monto, 0);
+    const totalEgresos = rows.filter((r) => r.tipo === "egreso").reduce((s, r) => s + r.monto, 0);
+    res.json({
+      movimientos: rows.map((r) => ({
+        id: r.id,
+        fecha: r.fecha,
+        tipo: r.tipo,
+        monto: r.monto,
+        concepto: r.concepto,
+      })),
+      totalIngresos,
+      totalEgresos,
+      neto: totalIngresos - totalEgresos,
     });
   } catch (e) {
     console.error(e);

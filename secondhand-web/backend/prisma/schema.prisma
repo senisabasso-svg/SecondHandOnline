@@ -20,6 +20,7 @@ model SecondHand {
   ventas      Venta[]
   ventaItems  VentaItem[]
   cajaSesiones CajaSesion[]
+  cajaMovimientos CajaMovimiento[]
   menuPrecios MenuPrecio[]
 
   @@map("second_hands")
@@ -81,9 +82,28 @@ model CajaSesion {
 
   secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
   ventas     Venta[]
+  movimientos CajaMovimiento[]
 
   @@index([idSecond, cerradaEn])
   @@map("caja_sesiones")
+}
+
+model CajaMovimiento {
+  id        Int      @id @default(autoincrement())
+  idSecond  Int      @map("id_second")
+  idCaja    Int      @map("id_caja")
+  tipo      String
+  monto     Float
+  concepto  String?
+  fecha     DateTime @default(now())
+
+  secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
+  caja       CajaSesion @relation(fields: [idCaja], references: [id], onDelete: Cascade)
+
+  @@index([idSecond])
+  @@index([idCaja])
+  @@index([idSecond, fecha])
+  @@map("caja_movimientos")
 }
 
 model Venta {

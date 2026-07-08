@@ -173,6 +173,79 @@ body {
   font-size: 0.9rem;
 }
 
+.caja-resumen-efectivo {
+  margin: 0.5rem 0 0;
+  font-size: 0.95rem;
+}
+
+.caja-movimientos {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.caja-movimientos-titulo {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.caja-movimientos-desc {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+}
+
+.caja-mov-form {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(100px, 0.8fr) minmax(160px, 2fr) auto;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 0.75rem;
+}
+
+.caja-mov-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.caja-mov-form input,
+.caja-mov-form select {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+}
+
+.caja-ver-mov-btn {
+  margin-bottom: 0.5rem;
+}
+
+.caja-mov-ingreso {
+  color: #059669;
+  font-weight: 600;
+}
+
+.caja-mov-egreso {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .caja-mov-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .caja-mov-concepto {
+    grid-column: 1 / -1;
+  }
+
+  .caja-mov-form button {
+    grid-column: 1 / -1;
+  }
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
