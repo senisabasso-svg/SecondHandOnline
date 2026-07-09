@@ -13,8 +13,22 @@ export type Producto = {
   talle: string | null;
   idProveedor: number;
   estado: string;
+  cantidad: number | null;
   nombreProveedor?: string | null;
 };
+
+function esProductoConStock(p: Producto) {
+  return p.cantidad != null;
+}
+
+function unidadesEnCarrito(cart: Producto[], id: number) {
+  return cart.filter((x) => x.id === id).length;
+}
+
+function stockRestante(p: Producto, cart: Producto[]) {
+  if (!esProductoConStock(p)) return cart.some((x) => x.id === p.id) ? 0 : 1;
+  return Math.max(0, (p.cantidad ?? 0) - unidadesEnCarrito(cart, p.id));
+}
 
 type CartLine = Producto;
 
@@ -242,14 +256,21 @@ export default function VentaPage() {
       setMsg("Debe abrir la caja antes de vender.");
       return;
     }
+    if (stockRestante(p, cart) <= 0) {
+      setMsg("No hay más unidades disponibles de este producto.");
+      return;
+    }
     setCart((c) => [...c, p]);
-    setDisponibles((d) => d.filter((x) => x.id !== p.id));
+    if (!esProductoConStock(p)) {
+      setDisponibles((d) => d.filter((x) => x.id !== p.id));
+    }
   };
 
-  const removeFromCart = (id: number) => {
-    const line = cart.find((x) => x.id === id);
-    if (line) {
-      setCart((c) => c.filter((x) => x.id !== id));
+  const removeFromCart = (index: number) => {
+    const line = cart[index];
+    if (!line) return;
+    setCart((c) => c.filter((_, i) => i !== index));
+    if (!esProductoConStock(line)) {
       setDisponibles((d) => [...d, line].sort((a, b) => b.id - a.id));
     }
   };
@@ -613,6 +634,7 @@ export default function VentaPage() {
                   <th>Color</th>
                   <th>Talle</th>
                   <th>Precio</th>
+                  <th>Stock</th>
                   <th>Proveedor</th>
                   <th></th>
                 </tr>
@@ -627,12 +649,13 @@ export default function VentaPage() {
                     <td>{p.color ?? EM}</td>
                     <td>{p.talle ?? EM}</td>
                     <td>${p.precioVenta.toFixed(2)}</td>
+                    <td>{stockRestante(p, cart)}</td>
                     <td>{p.nombreProveedor ?? EM}</td>
                     <td>
                       <button
                         type="button"
                         className="btn btn-primary"
-                        disabled={!cajaAbierta}
+                        disabled={!cajaAbierta || stockRestante(p, cart) <= 0}
                         onClick={() => addToCart(p)}
                       >
                         Al carrito
@@ -681,12 +704,12 @@ export default function VentaPage() {
               </tr>
             </thead>
             <tbody>
-              {cart.map((p) => (
-                <tr key={p.id}>
+              {cart.map((p, index) => (
+                <tr key={`${p.id}-${index}`}>
                   <td>{p.descripcion}</td>
                   <td>${p.precioVenta.toFixed(2)}</td>
                   <td>
-                    <button type="button" className="btn btn-ghost" onClick={() => removeFromCart(p.id)}>
+                    <button type="button" className="btn btn-ghost" onClick={() => removeFromCart(index)}>
                       Quitar
                     </button>
                   </td>

@@ -21,6 +21,7 @@ export default function ProductosPage() {
     precioVenta: "",
     talle: "",
     idProveedor: "",
+    cantidad: "1",
   });
   const [formEdit, setFormEdit] = useState({
     descripcion: "",
@@ -32,7 +33,9 @@ export default function ProductosPage() {
     talle: "",
     idProveedor: "",
     estado: "disponible",
+    cantidad: "",
   });
+  const [editTieneStock, setEditTieneStock] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -62,6 +65,7 @@ export default function ProductosPage() {
 
   const startEdit = (p: Producto) => {
     setEditId(p.id);
+    setEditTieneStock(p.cantidad != null);
     setFormEdit({
       descripcion: p.descripcion || "",
       tipoPrenda: p.tipoPrenda || "",
@@ -72,12 +76,14 @@ export default function ProductosPage() {
       talle: p.talle || "",
       idProveedor: String(p.idProveedor ?? ""),
       estado: p.estado || "disponible",
+      cantidad: p.cantidad != null ? String(p.cantidad) : "",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const cancelEdit = () => {
     setEditId(null);
+    setEditTieneStock(false);
   };
 
   const saveEdit = async (e: React.FormEvent) => {
@@ -85,19 +91,21 @@ export default function ProductosPage() {
     if (!editId) return;
     setMsg(null);
     try {
+      const body: Record<string, unknown> = {
+        descripcion: formEdit.descripcion,
+        tipoPrenda: formEdit.tipoPrenda || null,
+        marca: formEdit.marca || null,
+        color: formEdit.color || null,
+        condicion: formEdit.condicion || null,
+        precioVenta: Number(formEdit.precioVenta),
+        talle: formEdit.talle || null,
+        idProveedor: Number(formEdit.idProveedor),
+        estado: formEdit.estado,
+      };
+      if (editTieneStock) body.cantidad = Number(formEdit.cantidad);
       await api(`/api/productos/${editId}`, {
         method: "PUT",
-        body: JSON.stringify({
-          descripcion: formEdit.descripcion,
-          tipoPrenda: formEdit.tipoPrenda || null,
-          marca: formEdit.marca || null,
-          color: formEdit.color || null,
-          condicion: formEdit.condicion || null,
-          precioVenta: Number(formEdit.precioVenta),
-          talle: formEdit.talle || null,
-          idProveedor: Number(formEdit.idProveedor),
-          estado: formEdit.estado,
-        }),
+        body: JSON.stringify(body),
       });
       await load();
       setMsg("Producto actualizado.");
@@ -110,8 +118,13 @@ export default function ProductosPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
-    if (!form.descripcion || !form.precioVenta || !form.idProveedor) {
+    if (!form.descripcion || !form.precioVenta || !form.idProveedor || !form.cantidad) {
       setMsg(T.completaProducto);
+      return;
+    }
+    const qty = Number(form.cantidad);
+    if (!Number.isInteger(qty) || qty < 1) {
+      setMsg("La cantidad debe ser un entero mayor o igual a 1.");
       return;
     }
     try {
@@ -127,6 +140,7 @@ export default function ProductosPage() {
           talle: form.talle || null,
           idProveedor: Number(form.idProveedor),
           estado: "disponible",
+          cantidad: qty,
         }),
       });
       setForm({
@@ -138,6 +152,7 @@ export default function ProductosPage() {
         precioVenta: "",
         talle: "",
         idProveedor: form.idProveedor,
+        cantidad: "1",
       });
       await load();
       setMsg("Producto agregado.");
@@ -225,6 +240,32 @@ export default function ProductosPage() {
               }
             />
           </label>
+          {!editId && (
+            <label>
+              Cantidad *
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={form.cantidad}
+                onChange={(e) => setForm((f) => ({ ...f, cantidad: e.target.value }))}
+                required
+              />
+            </label>
+          )}
+          {editId && editTieneStock && (
+            <label>
+              Cantidad
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={formEdit.cantidad}
+                onChange={(e) => setFormEdit((f) => ({ ...f, cantidad: e.target.value }))}
+                required
+              />
+            </label>
+          )}
           <label>
             Proveedor *
             <select
@@ -297,6 +338,7 @@ export default function ProductosPage() {
                   <th>Cond.</th>
                   <th>Talle</th>
                   <th>Precio</th>
+                  <th>Cant.</th>
                   <th>Estado</th>
                   <th>Proveedor</th>
                 </tr>
@@ -312,6 +354,7 @@ export default function ProductosPage() {
                     <td>{p.condicion ?? EM}</td>
                     <td>{p.talle ?? EM}</td>
                     <td>${p.precioVenta.toFixed(2)}</td>
+                    <td>{p.cantidad != null ? p.cantidad : 1}</td>
                     <td>{p.estado}</td>
                     <td>{p.nombreProveedor ?? EM}</td>
                     <td>

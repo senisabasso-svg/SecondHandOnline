@@ -622,24 +622,33 @@ app.get("/api/cuentas-corrientes/:id/movimientos", async (req, res) => {
   }
 });
 
+function mapProducto(p) {
+  return {
+    id: p.id,
+    descripcion: p.descripcion,
+    tipoPrenda: p.tipoPrenda,
+    marca: p.marca,
+    color: p.color,
+    condicion: p.condicion,
+    precioVenta: p.precioVenta,
+    talle: p.talle,
+    idProveedor: p.idProveedor,
+    estado: p.estado,
+    cantidad: p.cantidad,
+    nombreProveedor: p.proveedor?.nombre,
+  };
+}
+
+const whereDisponibles = (idSecond) => ({
+  idSecond,
+  estado: "disponible",
+  OR: [{ cantidad: null }, { cantidad: { gt: 0 } }],
+});
+
 app.get("/api/productos", async (req, res) => {
   try {
     const rows = await prisma.producto.findMany({ where: tw(req), include: { proveedor: true }, orderBy: { id: "desc" } });
-    res.json(
-      rows.map((p) => ({
-        id: p.id,
-        descripcion: p.descripcion,
-        tipoPrenda: p.tipoPrenda,
-        marca: p.marca,
-        color: p.color,
-        condicion: p.condicion,
-        precioVenta: p.precioVenta,
-        talle: p.talle,
-        idProveedor: p.idProveedor,
-        estado: p.estado,
-        nombreProveedor: p.proveedor?.nombre,
-      }))
-    );
+    res.json(rows.map(mapProducto));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: String(e.message) });
@@ -649,25 +658,11 @@ app.get("/api/productos", async (req, res) => {
 app.get("/api/productos/disponibles", async (req, res) => {
   try {
     const rows = await prisma.producto.findMany({
-      where: { ...tw(req), estado: "disponible" },
+      where: whereDisponibles(req.user.idSecond),
       include: { proveedor: true },
       orderBy: { id: "desc" },
     });
-    res.json(
-      rows.map((p) => ({
-        id: p.id,
-        descripcion: p.descripcion,
-        tipoPrenda: p.tipoPrenda,
-        marca: p.marca,
-        color: p.color,
-        condicion: p.condicion,
-        precioVenta: p.precioVenta,
-        talle: p.talle,
-        idProveedor: p.idProveedor,
-        estado: p.estado,
-        nombreProveedor: p.proveedor?.nombre,
-      }))
-    );
+    res.json(rows.map(mapProducto));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: String(e.message) });
@@ -676,9 +671,13 @@ app.get("/api/productos/disponibles", async (req, res) => {
 
 app.post("/api/productos", async (req, res) => {
   try {
-    const { descripcion, tipoPrenda, marca, color, condicion, precioVenta, talle, idProveedor, estado } = req.body;
+    const { descripcion, tipoPrenda, marca, color, condicion, precioVenta, talle, idProveedor, estado, cantidad } = req.body;
     if (!descripcion || precioVenta == null || !idProveedor) {
       return res.status(400).json({ error: "DescripciÃ³n, precio de venta e identificador de proveedor son obligatorios." });
+    }
+    const qty = Number(cantidad);
+    if (!Number.isInteger(qty) || qty < 1) {
+      return res.status(400).json({ error: "La cantidad debe ser un entero mayor o igual a 1." });
     }
     const prov = await prisma.proveedor.findFirst({ where: { id: Number(idProveedor), idSecond: req.user.idSecond } });
     if (!prov) return res.status(400).json({ error: "Proveedor no vÃ¡lido para esta tienda." });
@@ -694,22 +693,11 @@ app.post("/api/productos", async (req, res) => {
         idProveedor: Number(idProveedor),
         idSecond: req.user.idSecond,
         estado: estado || "disponible",
+        cantidad: qty,
       },
       include: { proveedor: true },
     });
-    res.status(201).json({
-      id: row.id,
-      descripcion: row.descripcion,
-      tipoPrenda: row.tipoPrenda,
-      marca: row.marca,
-      color: row.color,
-      condicion: row.condicion,
-      precioVenta: row.precioVenta,
-      talle: row.talle,
-      idProveedor: row.idProveedor,
-      estado: row.estado,
-      nombreProveedor: row.proveedor?.nombre,
-    });
+    res.status(201).json(mapProducto(row));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: String(e.message) });
@@ -721,44 +709,46 @@ app.put("/api/productos/:id", async (req, res) => {
     const id = Number(req.params.id);
     const existente = await prisma.producto.findFirst({ where: { id, idSecond: req.user.idSecond } });
     if (!existente) return res.status(404).json({ error: "Producto no encontrado en su tienda." });
-    const { descripcion, tipoPrenda, marca, color, condicion, precioVenta, talle, idProveedor, estado } = req.body;
+    const { descripcion, tipoPrenda, marca, color, condicion, precioVenta, talle, idProveedor, estado, cantidad } = req.body;
     if (idProveedor) {
       const prov = await prisma.proveedor.findFirst({ where: { id: Number(idProveedor), idSecond: req.user.idSecond } });
       if (!prov) return res.status(400).json({ error: "Proveedor no vÃ¡lido para esta tienda." });
     }
+    const updateData = {
+      ...(descripcion !== undefined ? { descripcion } : {}),
+      ...(tipoPrenda !== undefined ? { tipoPrenda: tipoPrenda || null } : {}),
+      ...(marca !== undefined ? { marca: marca || null } : {}),
+      ...(color !== undefined ? { color: color || null } : {}),
+      ...(condicion !== undefined ? { condicion: condicion || null } : {}),
+      ...(precioVenta !== undefined ? { precioVenta: Number(precioVenta) } : {}),
+      ...(talle !== undefined ? { talle: talle || null } : {}),
+      ...(idProveedor !== undefined ? { idProveedor: Number(idProveedor) } : {}),
+      ...(estado !== undefined ? { estado } : {}),
+    };
+    if (cantidad !== undefined) {
+      if (existente.cantidad == null) {
+        return res.status(400).json({ error: "No se puede asignar cantidad a un producto existente (modo unidad única)." });
+      }
+      const qty = Number(cantidad);
+      if (!Number.isInteger(qty) || qty < 0) {
+        return res.status(400).json({ error: "La cantidad debe ser un entero mayor o igual a 0." });
+      }
+      updateData.cantidad = qty;
+      if (qty === 0) updateData.estado = "vendido";
+      else if (existente.estado === "vendido" && qty > 0) updateData.estado = "disponible";
+    }
     const updated = await prisma.producto.update({
       where: { id },
-      data: {
-        ...(descripcion !== undefined ? { descripcion } : {}),
-        ...(tipoPrenda !== undefined ? { tipoPrenda: tipoPrenda || null } : {}),
-        ...(marca !== undefined ? { marca: marca || null } : {}),
-        ...(color !== undefined ? { color: color || null } : {}),
-        ...(condicion !== undefined ? { condicion: condicion || null } : {}),
-        ...(precioVenta !== undefined ? { precioVenta: Number(precioVenta) } : {}),
-        ...(talle !== undefined ? { talle: talle || null } : {}),
-        ...(idProveedor !== undefined ? { idProveedor: Number(idProveedor) } : {}),
-        ...(estado !== undefined ? { estado } : {}),
-      },
+      data: updateData,
       include: { proveedor: true },
     });
-    res.json({
-      id: updated.id,
-      descripcion: updated.descripcion,
-      tipoPrenda: updated.tipoPrenda,
-      marca: updated.marca,
-      color: updated.color,
-      condicion: updated.condicion,
-      precioVenta: updated.precioVenta,
-      talle: updated.talle,
-      idProveedor: updated.idProveedor,
-      estado: updated.estado,
-      nombreProveedor: updated.proveedor?.nombre,
-    });
+    res.json(mapProducto(updated));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: String(e.message) });
   }
 });
+
 app.get("/api/caja/diario", async (req, res) => {
   try {
     const idSecond = req.user.idSecond;
@@ -936,10 +926,31 @@ app.post("/api/ventas", async (req, res) => {
         return res.status(400).json({ error: "El cliente seleccionado no tiene cuenta corriente." });
       }
     }
-    const ids = items.map((i) => Number(i.idProducto));
-    const productos = await prisma.producto.findMany({ where: { id: { in: ids }, idSecond, estado: "disponible" } });
-    if (productos.length !== ids.length) {
+    const uniqueIds = [...new Set(items.map((i) => Number(i.idProducto)))];
+    const qtyByProduct = items.reduce((acc, it) => {
+      const pid = Number(it.idProducto);
+      acc[pid] = (acc[pid] || 0) + 1;
+      return acc;
+    }, {});
+    const productos = await prisma.producto.findMany({
+      where: { id: { in: uniqueIds }, idSecond, estado: "disponible" },
+    });
+    if (productos.length !== uniqueIds.length) {
       return res.status(400).json({ error: "AlgÃºn producto no existe, no estÃ¡ disponible o no pertenece a su tienda." });
+    }
+    const productoMap = new Map(productos.map((p) => [p.id, p]));
+    for (const [pid, qtySold] of Object.entries(qtyByProduct)) {
+      const p = productoMap.get(Number(pid));
+      if (!p) continue;
+      if (p.cantidad == null) {
+        if (qtySold > 1) {
+          return res.status(400).json({ error: `El producto "${p.descripcion}" solo permite vender una unidad por vez.` });
+        }
+      } else if (qtySold > p.cantidad) {
+        return res.status(400).json({
+          error: `Stock insuficiente para "${p.descripcion}". Disponible: ${p.cantidad}, solicitado: ${qtySold}.`,
+        });
+      }
     }
     const total = items.reduce((s, i) => s + Number(i.precioUnitario || 0), 0);
     if (medio === "cuenta_corriente") {
@@ -969,7 +980,22 @@ app.post("/api/ventas", async (req, res) => {
             idSecond,
           },
         });
-        await tx.producto.update({ where: { id: Number(it.idProducto) }, data: { estado: "vendido" } });
+      }
+      for (const [pid, qtySold] of Object.entries(qtyByProduct)) {
+        const p = productoMap.get(Number(pid));
+        if (!p) continue;
+        if (p.cantidad == null) {
+          await tx.producto.update({ where: { id: p.id }, data: { estado: "vendido" } });
+        } else {
+          const nuevaCantidad = p.cantidad - qtySold;
+          await tx.producto.update({
+            where: { id: p.id },
+            data: {
+              cantidad: nuevaCantidad,
+              ...(nuevaCantidad <= 0 ? { estado: "vendido" } : {}),
+            },
+          });
+        }
       }
       if (medio === "cuenta_corriente" && cuenta) {
         await tx.cuentaCorrienteMovimiento.create({

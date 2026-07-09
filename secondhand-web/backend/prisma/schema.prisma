@@ -68,6 +68,7 @@ model Producto {
   talle        String?
   idProveedor  Int     @map("id_proveedor")
   estado       String  @default("disponible")
+  cantidad     Int?
 
   secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
   proveedor  Proveedor  @relation(fields: [idProveedor], references: [id])
