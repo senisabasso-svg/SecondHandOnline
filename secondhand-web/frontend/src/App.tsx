@@ -9,6 +9,7 @@ import InformesPage from "./pages/InformesPage";
 import LoginPage from "./pages/LoginPage";
 import SuperadminPage from "./pages/SuperadminPage";
 import ProveedorLoginPage from "./pages/ProveedorLoginPage";
+import ProveedorPortalPage from "./pages/ProveedorPortalPage";
 import ClientesPage from "./pages/ClientesPage";
 import CuentasCorrientesPage from "./pages/CuentasCorrientesPage";
 
