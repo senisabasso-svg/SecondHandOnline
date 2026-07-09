@@ -5,6 +5,11 @@ import type { Producto } from "./VentaPage";
 
 type Proveedor = { id: number; nombre: string; telefono: string | null; email: string | null };
 
+function optionalStr(value: string) {
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
 export default function ProductosPage() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
@@ -93,12 +98,12 @@ export default function ProductosPage() {
     try {
       const body: Record<string, unknown> = {
         descripcion: formEdit.descripcion,
-        tipoPrenda: formEdit.tipoPrenda || null,
-        marca: formEdit.marca || null,
-        color: formEdit.color || null,
-        condicion: formEdit.condicion || null,
+        tipoPrenda: optionalStr(formEdit.tipoPrenda),
+        marca: optionalStr(formEdit.marca),
+        color: optionalStr(formEdit.color),
+        condicion: optionalStr(formEdit.condicion),
         precioVenta: Number(formEdit.precioVenta),
-        talle: formEdit.talle || null,
+        talle: optionalStr(formEdit.talle),
         idProveedor: Number(formEdit.idProveedor),
         estado: formEdit.estado,
       };
@@ -132,12 +137,12 @@ export default function ProductosPage() {
         method: "POST",
         body: JSON.stringify({
           descripcion: form.descripcion,
-          tipoPrenda: form.tipoPrenda || null,
-          marca: form.marca || null,
-          color: form.color || null,
-          condicion: form.condicion || null,
+          tipoPrenda: optionalStr(form.tipoPrenda),
+          marca: optionalStr(form.marca),
+          color: optionalStr(form.color),
+          condicion: optionalStr(form.condicion),
           precioVenta: Number(form.precioVenta),
-          talle: form.talle || null,
+          talle: optionalStr(form.talle),
           idProveedor: Number(form.idProveedor),
           estado: "disponible",
           cantidad: qty,
@@ -179,9 +184,10 @@ export default function ProductosPage() {
             />
           </label>
           <label>
-            Tipo de prenda
+            Tipo de prenda (opcional)
             <input
               value={editId ? formEdit.tipoPrenda : form.tipoPrenda}
+              placeholder="Opcional"
               onChange={(e) =>
                 editId ? setFormEdit((f) => ({ ...f, tipoPrenda: e.target.value })) : setForm((f) => ({ ...f, tipoPrenda: e.target.value }))
               }

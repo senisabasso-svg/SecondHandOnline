@@ -622,6 +622,12 @@ app.get("/api/cuentas-corrientes/:id/movimientos", async (req, res) => {
   }
 });
 
+function optionalStr(value) {
+  if (value == null) return null;
+  const s = String(value).trim();
+  return s === "" ? null : s;
+}
+
 function mapProducto(p) {
   return {
     id: p.id,
@@ -684,12 +690,12 @@ app.post("/api/productos", async (req, res) => {
     const row = await prisma.producto.create({
       data: {
         descripcion,
-        tipoPrenda: tipoPrenda || null,
-        marca: marca || null,
-        color: color || null,
-        condicion: condicion || null,
+        tipoPrenda: optionalStr(tipoPrenda),
+        marca: optionalStr(marca),
+        color: optionalStr(color),
+        condicion: optionalStr(condicion),
         precioVenta: Number(precioVenta),
-        talle: talle || null,
+        talle: optionalStr(talle),
         idProveedor: Number(idProveedor),
         idSecond: req.user.idSecond,
         estado: estado || "disponible",
@@ -716,12 +722,12 @@ app.put("/api/productos/:id", async (req, res) => {
     }
     const updateData = {
       ...(descripcion !== undefined ? { descripcion } : {}),
-      ...(tipoPrenda !== undefined ? { tipoPrenda: tipoPrenda || null } : {}),
-      ...(marca !== undefined ? { marca: marca || null } : {}),
-      ...(color !== undefined ? { color: color || null } : {}),
-      ...(condicion !== undefined ? { condicion: condicion || null } : {}),
+      ...(tipoPrenda !== undefined ? { tipoPrenda: optionalStr(tipoPrenda) } : {}),
+      ...(marca !== undefined ? { marca: optionalStr(marca) } : {}),
+      ...(color !== undefined ? { color: optionalStr(color) } : {}),
+      ...(condicion !== undefined ? { condicion: optionalStr(condicion) } : {}),
       ...(precioVenta !== undefined ? { precioVenta: Number(precioVenta) } : {}),
-      ...(talle !== undefined ? { talle: talle || null } : {}),
+      ...(talle !== undefined ? { talle: optionalStr(talle) } : {}),
       ...(idProveedor !== undefined ? { idProveedor: Number(idProveedor) } : {}),
       ...(estado !== undefined ? { estado } : {}),
     };
