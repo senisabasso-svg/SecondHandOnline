@@ -5,6 +5,7 @@ import { EM, ELLIPSIS, T } from "../lib/uiText";
 function labelMedioPago(m?: string | null) {
   if (m === "efectivo") return "Efectivo";
   if (m === "tarjeta") return "Tarjeta";
+  if (m === "cuenta_corriente") return "Cuenta corriente";
   return EM;
 }
 

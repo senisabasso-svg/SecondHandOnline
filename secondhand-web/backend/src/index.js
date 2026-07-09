@@ -304,6 +304,8 @@ app.post("/api/super/usuarios", authOptional, requireAuth, requireSuperadmin, as
 });
 
 app.use("/api/proveedores", authOptional, requireAuth, requireTenant);
+app.use("/api/clientes", authOptional, requireAuth, requireTenant);
+app.use("/api/cuentas-corrientes", authOptional, requireAuth, requireTenant);
 app.use("/api/productos", authOptional, requireAuth, requireTenant);
 app.use("/api/ventas", authOptional, requireAuth, requireTenant);
 app.use("/api/caja", authOptional, requireAuth, requireTenant);
@@ -312,8 +314,41 @@ app.use("/api/menu-precios", authOptional, requireAuth, requireTenant);
 
 const tw = (req) => ({ idSecond: req.user.idSecond });
 
-const MEDIOS_PAGO = new Set(["efectivo", "tarjeta"]);
+const MEDIOS_PAGO = new Set(["efectivo", "tarjeta", "cuenta_corriente"]);
 const TIPOS_MOVIMIENTO_CAJA = new Set(["ingreso", "egreso"]);
+const TIPOS_DOCUMENTO = new Set(["cedula", "rut", "otro"]);
+
+function mapCliente(row) {
+  const cc = row.cuentaCorriente;
+  return {
+    id: row.id,
+    nombre: row.nombre,
+    tipoDocumento: row.tipoDocumento,
+    numeroDocumento: row.numeroDocumento,
+    tieneCuentaCorriente: Boolean(cc),
+    cuentaCorriente: cc
+      ? {
+          id: cc.id,
+          limite: cc.limite,
+          saldo: cc.saldo,
+          disponible: cc.limite - cc.saldo,
+        }
+      : null,
+  };
+}
+
+function mapCuentaCorriente(row) {
+  return {
+    id: row.id,
+    idCliente: row.idCliente,
+    nombreCliente: row.cliente.nombre,
+    tipoDocumento: row.cliente.tipoDocumento,
+    numeroDocumento: row.cliente.numeroDocumento,
+    limite: row.limite,
+    saldo: row.saldo,
+    disponible: row.limite - row.saldo,
+  };
+}
 
 function dayBounds(d = new Date()) {
   const start = new Date(d);
@@ -347,6 +382,240 @@ app.post("/api/proveedores", async (req, res) => {
       data: { nombre, telefono: telefono || null, email: email || null, idSecond: req.user.idSecond },
     });
     res.status(201).json(row);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.get("/api/clientes", async (req, res) => {
+  try {
+    const rows = await prisma.cliente.findMany({
+      where: tw(req),
+      include: { cuentaCorriente: true },
+      orderBy: { nombre: "asc" },
+    });
+    res.json(rows.map(mapCliente));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.post("/api/clientes", async (req, res) => {
+  try {
+    const { nombre, tipoDocumento, numeroDocumento } = req.body;
+    if (!nombre?.trim()) return res.status(400).json({ error: "El nombre es obligatorio." });
+    const tipo = typeof tipoDocumento === "string" ? tipoDocumento.trim().toLowerCase() : "";
+    if (!TIPOS_DOCUMENTO.has(tipo)) {
+      return res.status(400).json({ error: "Tipo de documento inválido. Use cedula, rut u otro." });
+    }
+    const numDoc = String(numeroDocumento || "").trim();
+    if (!numDoc) return res.status(400).json({ error: "El número de documento es obligatorio." });
+    const row = await prisma.cliente.create({
+      data: {
+        nombre: nombre.trim(),
+        tipoDocumento: tipo,
+        numeroDocumento: numDoc,
+        idSecond: req.user.idSecond,
+      },
+      include: { cuentaCorriente: true },
+    });
+    res.status(201).json(mapCliente(row));
+  } catch (e) {
+    if (e.code === "P2002") {
+      return res.status(400).json({ error: "Ya existe un cliente con ese documento en esta tienda." });
+    }
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.put("/api/clientes/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const existente = await prisma.cliente.findFirst({ where: { id, idSecond: req.user.idSecond } });
+    if (!existente) return res.status(404).json({ error: "Cliente no encontrado." });
+    const { nombre, tipoDocumento, numeroDocumento } = req.body;
+    const data = {};
+    if (nombre !== undefined) {
+      if (!String(nombre).trim()) return res.status(400).json({ error: "El nombre es obligatorio." });
+      data.nombre = String(nombre).trim();
+    }
+    if (tipoDocumento !== undefined) {
+      const tipo = String(tipoDocumento).trim().toLowerCase();
+      if (!TIPOS_DOCUMENTO.has(tipo)) {
+        return res.status(400).json({ error: "Tipo de documento inválido. Use cedula, rut u otro." });
+      }
+      data.tipoDocumento = tipo;
+    }
+    if (numeroDocumento !== undefined) {
+      const numDoc = String(numeroDocumento).trim();
+      if (!numDoc) return res.status(400).json({ error: "El número de documento es obligatorio." });
+      data.numeroDocumento = numDoc;
+    }
+    const row = await prisma.cliente.update({
+      where: { id },
+      data,
+      include: { cuentaCorriente: true },
+    });
+    res.json(mapCliente(row));
+  } catch (e) {
+    if (e.code === "P2002") {
+      return res.status(400).json({ error: "Ya existe un cliente con ese documento en esta tienda." });
+    }
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.get("/api/cuentas-corrientes", async (req, res) => {
+  try {
+    const rows = await prisma.cuentaCorriente.findMany({
+      where: tw(req),
+      include: { cliente: true },
+      orderBy: { id: "desc" },
+    });
+    res.json(rows.map(mapCuentaCorriente));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.post("/api/cuentas-corrientes", async (req, res) => {
+  try {
+    const { idCliente, limite } = req.body;
+    const idCli = Number(idCliente);
+    if (!idCli) return res.status(400).json({ error: "Debe seleccionar un cliente." });
+    const importeLimite = Number(limite);
+    if (!Number.isFinite(importeLimite) || importeLimite <= 0) {
+      return res.status(400).json({ error: "El límite debe ser mayor a cero." });
+    }
+    const cliente = await prisma.cliente.findFirst({
+      where: { id: idCli, idSecond: req.user.idSecond },
+      include: { cuentaCorriente: true },
+    });
+    if (!cliente) return res.status(404).json({ error: "Cliente no encontrado." });
+    if (cliente.cuentaCorriente) {
+      return res.status(400).json({ error: "Este cliente ya tiene una cuenta corriente." });
+    }
+    const row = await prisma.cuentaCorriente.create({
+      data: { idSecond: req.user.idSecond, idCliente: idCli, limite: importeLimite, saldo: 0 },
+      include: { cliente: true },
+    });
+    res.status(201).json(mapCuentaCorriente(row));
+  } catch (e) {
+    if (e.code === "P2002") {
+      return res.status(400).json({ error: "Este cliente ya tiene una cuenta corriente." });
+    }
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.put("/api/cuentas-corrientes/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const existente = await prisma.cuentaCorriente.findFirst({
+      where: { id, idSecond: req.user.idSecond },
+    });
+    if (!existente) return res.status(404).json({ error: "Cuenta corriente no encontrada." });
+    const importeLimite = Number(req.body.limite);
+    if (!Number.isFinite(importeLimite) || importeLimite <= 0) {
+      return res.status(400).json({ error: "El límite debe ser mayor a cero." });
+    }
+    if (importeLimite < existente.saldo) {
+      return res.status(400).json({
+        error: `El límite no puede ser menor al saldo actual ($${existente.saldo.toFixed(2)}).`,
+      });
+    }
+    const row = await prisma.cuentaCorriente.update({
+      where: { id },
+      data: { limite: importeLimite },
+      include: { cliente: true },
+    });
+    res.json(mapCuentaCorriente(row));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.post("/api/cuentas-corrientes/:id/entregas", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { monto, concepto } = req.body;
+    const importe = Number(monto);
+    if (!Number.isFinite(importe) || importe <= 0) {
+      return res.status(400).json({ error: "El monto debe ser mayor a cero." });
+    }
+    const cuenta = await prisma.cuentaCorriente.findFirst({
+      where: { id, idSecond: req.user.idSecond },
+      include: { cliente: true },
+    });
+    if (!cuenta) return res.status(404).json({ error: "Cuenta corriente no encontrada." });
+    if (importe > cuenta.saldo) {
+      return res.status(400).json({
+        error: `La entrega no puede superar el saldo deudor ($${cuenta.saldo.toFixed(2)}).`,
+      });
+    }
+    const result = await prisma.$transaction(async (tx) => {
+      const mov = await tx.cuentaCorrienteMovimiento.create({
+        data: {
+          idSecond: req.user.idSecond,
+          idCuenta: cuenta.id,
+          tipo: "entrega",
+          monto: importe,
+          concepto: concepto?.trim() || null,
+        },
+      });
+      const updated = await tx.cuentaCorriente.update({
+        where: { id: cuenta.id },
+        data: { saldo: { decrement: importe } },
+        include: { cliente: true },
+      });
+      return { mov, cuenta: updated };
+    });
+    res.status(201).json({
+      movimiento: {
+        id: result.mov.id,
+        fecha: result.mov.fecha,
+        tipo: result.mov.tipo,
+        monto: result.mov.monto,
+        concepto: result.mov.concepto,
+      },
+      cuenta: mapCuentaCorriente(result.cuenta),
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.get("/api/cuentas-corrientes/:id/movimientos", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const cuenta = await prisma.cuentaCorriente.findFirst({
+      where: { id, idSecond: req.user.idSecond },
+    });
+    if (!cuenta) return res.status(404).json({ error: "Cuenta corriente no encontrada." });
+    const rows = await prisma.cuentaCorrienteMovimiento.findMany({
+      where: { idCuenta: id, idSecond: req.user.idSecond },
+      orderBy: { fecha: "desc" },
+      include: { venta: { select: { id: true } } },
+    });
+    res.json(
+      rows.map((m) => ({
+        id: m.id,
+        fecha: m.fecha,
+        tipo: m.tipo,
+        monto: m.monto,
+        concepto: m.concepto,
+        idVenta: m.idVenta,
+        ventaNumero: m.venta?.id ?? null,
+      }))
+    );
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: String(e.message) });
@@ -511,6 +780,9 @@ app.get("/api/caja/diario", async (req, res) => {
     const totalTarjeta = ventas
       .filter((v) => v.medioPago === "tarjeta")
       .reduce((s, v) => s + v.total, 0);
+    const totalCuentaCorriente = ventas
+      .filter((v) => v.medioPago === "cuenta_corriente")
+      .reduce((s, v) => s + v.total, 0);
     const totalIngresos = movimientos
       .filter((m) => m.tipo === "ingreso")
       .reduce((s, m) => s + m.monto, 0);
@@ -540,6 +812,7 @@ app.get("/api/caja/diario", async (req, res) => {
       totalDia,
       totalEfectivo,
       totalTarjeta,
+      totalCuentaCorriente,
       totalIngresos,
       totalEgresos,
       efectivoEnCaja,
@@ -630,19 +903,38 @@ app.post("/api/caja/cerrar", async (req, res) => {
 });
 
 app.post("/api/ventas", async (req, res) => {
-  const { items, medioPago } = req.body;
+  const { items, medioPago, idCliente } = req.body;
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: "Debe enviar al menos un artÃ­culo en la venta." });
   }
   const medio = typeof medioPago === "string" ? medioPago.trim().toLowerCase() : "";
   if (!MEDIOS_PAGO.has(medio)) {
-    return res.status(400).json({ error: "Seleccione medio de pago: efectivo o tarjeta." });
+    return res.status(400).json({ error: "Seleccione medio de pago: efectivo, tarjeta o cuenta corriente." });
   }
   const idSecond = req.user.idSecond;
+  const idCli = idCliente != null && idCliente !== "" ? Number(idCliente) : null;
+  if (medio === "cuenta_corriente" && !idCli) {
+    return res.status(400).json({ error: "Debe seleccionar un cliente para venta en cuenta corriente." });
+  }
   try {
     const caja = await getCajaAbierta(idSecond);
     if (!caja) {
       return res.status(403).json({ error: "Debe abrir la caja antes de registrar ventas." });
+    }
+    let cliente = null;
+    let cuenta = null;
+    if (idCli) {
+      cliente = await prisma.cliente.findFirst({
+        where: { id: idCli, idSecond },
+        include: { cuentaCorriente: true },
+      });
+      if (!cliente) return res.status(400).json({ error: "Cliente no válido para esta tienda." });
+      cuenta = cliente.cuentaCorriente;
+    }
+    if (medio === "cuenta_corriente") {
+      if (!cuenta) {
+        return res.status(400).json({ error: "El cliente seleccionado no tiene cuenta corriente." });
+      }
     }
     const ids = items.map((i) => Number(i.idProducto));
     const productos = await prisma.producto.findMany({ where: { id: { in: ids }, idSecond, estado: "disponible" } });
@@ -650,8 +942,24 @@ app.post("/api/ventas", async (req, res) => {
       return res.status(400).json({ error: "AlgÃºn producto no existe, no estÃ¡ disponible o no pertenece a su tienda." });
     }
     const total = items.reduce((s, i) => s + Number(i.precioUnitario || 0), 0);
+    if (medio === "cuenta_corriente") {
+      const disponible = cuenta.limite - cuenta.saldo;
+      if (total > disponible) {
+        return res.status(400).json({
+          error: `Crédito insuficiente. Disponible: $${disponible.toFixed(2)}, venta: $${total.toFixed(2)}.`,
+        });
+      }
+    }
     const result = await prisma.$transaction(async (tx) => {
-      const venta = await tx.venta.create({ data: { total, idSecond, idCaja: caja.id, medioPago: medio } });
+      const venta = await tx.venta.create({
+        data: {
+          total,
+          idSecond,
+          idCaja: caja.id,
+          medioPago: medio,
+          idCliente: idCli,
+        },
+      });
       for (const it of items) {
         await tx.ventaItem.create({
           data: {
@@ -663,6 +971,22 @@ app.post("/api/ventas", async (req, res) => {
         });
         await tx.producto.update({ where: { id: Number(it.idProducto) }, data: { estado: "vendido" } });
       }
+      if (medio === "cuenta_corriente" && cuenta) {
+        await tx.cuentaCorrienteMovimiento.create({
+          data: {
+            idSecond,
+            idCuenta: cuenta.id,
+            tipo: "cargo",
+            monto: total,
+            concepto: `Venta #${venta.id}`,
+            idVenta: venta.id,
+          },
+        });
+        await tx.cuentaCorriente.update({
+          where: { id: cuenta.id },
+          data: { saldo: { increment: total } },
+        });
+      }
       return venta;
     });
     res.status(201).json({
@@ -670,6 +994,7 @@ app.post("/api/ventas", async (req, res) => {
       total: result.total,
       fecha: result.fecha,
       medioPago: result.medioPago,
+      idCliente: result.idCliente,
     });
   } catch (e) {
     console.error(e);

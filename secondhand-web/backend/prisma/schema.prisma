@@ -22,6 +22,9 @@ model SecondHand {
   cajaSesiones CajaSesion[]
   cajaMovimientos CajaMovimiento[]
   menuPrecios MenuPrecio[]
+  clientes Cliente[]
+  cuentasCorrientes CuentaCorriente[]
+  cuentaCorrienteMovimientos CuentaCorrienteMovimiento[]
 
   @@map("second_hands")
 }
@@ -110,16 +113,20 @@ model Venta {
   id        Int      @id @default(autoincrement())
   idSecond  Int      @map("id_second")
   idCaja    Int?     @map("id_caja")
+  idCliente Int?     @map("id_cliente")
   fecha     DateTime @default(now())
   total     Float
   medioPago String?  @map("medio_pago")
 
   secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
   caja       CajaSesion? @relation(fields: [idCaja], references: [id], onDelete: SetNull)
+  cliente    Cliente? @relation(fields: [idCliente], references: [id], onDelete: SetNull)
   items      VentaItem[]
+  cuentaCorrienteMovimiento CuentaCorrienteMovimiento?
 
   @@index([idSecond])
   @@index([idCaja])
+  @@index([idCliente])
   @@map("ventas")
 }
 
@@ -148,4 +155,55 @@ model MenuPrecio {
 
   @@index([idSecond])
   @@map("menu_precios")
+}
+
+model Cliente {
+  id              Int    @id @default(autoincrement())
+  idSecond        Int    @map("id_second")
+  nombre          String
+  tipoDocumento   String @map("tipo_documento")
+  numeroDocumento String @map("numero_documento")
+
+  secondHand      SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
+  cuentaCorriente CuentaCorriente?
+  ventas          Venta[]
+
+  @@unique([idSecond, tipoDocumento, numeroDocumento])
+  @@index([idSecond])
+  @@map("clientes")
+}
+
+model CuentaCorriente {
+  id        Int   @id @default(autoincrement())
+  idSecond  Int   @map("id_second")
+  idCliente Int   @unique @map("id_cliente")
+  limite    Float
+  saldo     Float @default(0)
+
+  secondHand  SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
+  cliente     Cliente @relation(fields: [idCliente], references: [id], onDelete: Cascade)
+  movimientos CuentaCorrienteMovimiento[]
+
+  @@index([idSecond])
+  @@map("cuentas_corrientes")
+}
+
+model CuentaCorrienteMovimiento {
+  id       Int      @id @default(autoincrement())
+  idSecond Int      @map("id_second")
+  idCuenta Int      @map("id_cuenta")
+  tipo     String
+  monto    Float
+  concepto String?
+  idVenta  Int?     @unique @map("id_venta")
+  fecha    DateTime @default(now())
+
+  secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
+  cuenta     CuentaCorriente @relation(fields: [idCuenta], references: [id], onDelete: Cascade)
+  venta      Venta? @relation(fields: [idVenta], references: [id], onDelete: SetNull)
+
+  @@index([idSecond])
+  @@index([idCuenta])
+  @@index([idSecond, fecha])
+  @@map("cuenta_corriente_movimientos")
 }

@@ -9,6 +9,9 @@ async function main() {
   // Borrado en orden por dependencias
   await prisma.ventaItem.deleteMany({});
   await prisma.venta.deleteMany({});
+  await prisma.cuentaCorrienteMovimiento.deleteMany({});
+  await prisma.cuentaCorriente.deleteMany({});
+  await prisma.cliente.deleteMany({});
   await prisma.cajaMovimiento.deleteMany({});
   await prisma.cajaSesion.deleteMany({});
   await prisma.producto.deleteMany({});

@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { EM, ELLIPSIS, T } from "../lib/uiText";
-import { useMemo } from "react";
 
 export type Producto = {
   id: number;
@@ -19,7 +18,21 @@ export type Producto = {
 
 type CartLine = Producto;
 
-export type MedioPago = "efectivo" | "tarjeta";
+export type MedioPago = "efectivo" | "tarjeta" | "cuenta_corriente";
+
+type ClienteVenta = {
+  id: number;
+  nombre: string;
+  tipoDocumento: string;
+  numeroDocumento: string;
+  tieneCuentaCorriente: boolean;
+  cuentaCorriente: {
+    id: number;
+    limite: number;
+    saldo: number;
+    disponible: number;
+  } | null;
+};
 
 export type TicketData = {
   ventaId: number;
@@ -41,6 +54,7 @@ type VentaDiaria = {
 function labelMedioPago(m?: string | null) {
   if (m === "efectivo") return "Efectivo";
   if (m === "tarjeta") return "Tarjeta";
+  if (m === "cuenta_corriente") return "Cuenta corriente";
   return EM;
 }
 
@@ -60,6 +74,7 @@ type CajaDiario = {
   totalDia: number;
   totalEfectivo: number;
   totalTarjeta: number;
+  totalCuentaCorriente?: number;
   totalIngresos: number;
   totalEgresos: number;
   efectivoEnCaja: number;
@@ -92,6 +107,8 @@ export default function VentaPage() {
   const [verMovimientos, setVerMovimientos] = useState(false);
   const [movForm, setMovForm] = useState({ tipo: "egreso" as "ingreso" | "egreso", monto: "", concepto: "" });
   const [modalPago, setModalPago] = useState(false);
+  const [clientes, setClientes] = useState<ClienteVenta[]>([]);
+  const [idClienteVenta, setIdClienteVenta] = useState<string>("");
 
   const loadCaja = useCallback(async () => {
     setLoadingCaja(true);
@@ -123,7 +140,19 @@ export default function VentaPage() {
     api<{ id: number; nombre: string }[]>("/api/proveedores")
       .then((rows) => setProveedores(rows.map((p) => ({ id: p.id, nombre: p.nombre }))))
       .catch(() => {});
+    api<ClienteVenta[]>("/api/clientes")
+      .then(setClientes)
+      .catch(() => {});
   }, [load, loadCaja]);
+
+  const clienteSeleccionado = useMemo(() => {
+    if (!idClienteVenta) return null;
+    return clientes.find((c) => c.id === Number(idClienteVenta)) ?? null;
+  }, [clientes, idClienteVenta]);
+
+  const puedeCuentaCorriente = Boolean(
+    clienteSeleccionado?.tieneCuentaCorriente && clienteSeleccionado.cuentaCorriente
+  );
 
   const cajaAbierta = caja?.sesionAbierta ?? false;
 
@@ -282,16 +311,31 @@ export default function VentaPage() {
       precioVenta: p.precioVenta,
     }));
     const totalVenta = cart.reduce((s, x) => s + x.precioVenta, 0);
+    if (medioPago === "cuenta_corriente") {
+      const disp = clienteSeleccionado?.cuentaCorriente?.disponible ?? 0;
+      if (!clienteSeleccionado?.tieneCuentaCorriente) {
+        setMsg("El cliente seleccionado no tiene cuenta corriente.");
+        setSaving(false);
+        return;
+      }
+      if (totalVenta > disp) {
+        setMsg(`Crédito insuficiente. Disponible: $${disp.toFixed(2)}.`);
+        setSaving(false);
+        return;
+      }
+    }
     try {
+      const body: { medioPago: MedioPago; items: { idProducto: number; precioUnitario: number }[]; idCliente?: number } = {
+        medioPago,
+        items: cart.map((p) => ({
+          idProducto: p.id,
+          precioUnitario: p.precioVenta,
+        })),
+      };
+      if (idClienteVenta) body.idCliente = Number(idClienteVenta);
       const res = await api<{ id: number; total: number; fecha: string; medioPago: MedioPago }>("/api/ventas", {
         method: "POST",
-        body: JSON.stringify({
-          medioPago,
-          items: cart.map((p) => ({
-            idProducto: p.id,
-            precioUnitario: p.precioVenta,
-          })),
-        }),
+        body: JSON.stringify(body),
       });
       const fechaLabel = new Date(res.fecha).toLocaleString("es-AR", {
         dateStyle: "short",
@@ -307,8 +351,12 @@ export default function VentaPage() {
       };
       setLastTicket(ticket);
       setCart([]);
+      setIdClienteVenta("");
       await load();
       await loadCaja();
+      api<ClienteVenta[]>("/api/clientes")
+        .then(setClientes)
+        .catch(() => {});
       setMsg("Venta registrada correctamente.");
       window.setTimeout(() => printTicket(ticket), 300);
     } catch (e) {
@@ -385,7 +433,10 @@ export default function VentaPage() {
               (ventas efectivo ${caja.totalEfectivo.toFixed(2)}
               {caja.totalIngresos > 0 ? ` + ingresos $${caja.totalIngresos.toFixed(2)}` : ""}
               {caja.totalEgresos > 0 ? ` − egresos $${caja.totalEgresos.toFixed(2)}` : ""}
-              {caja.totalTarjeta > 0 ? ` · tarjeta $${caja.totalTarjeta.toFixed(2)}` : ""})
+              {caja.totalTarjeta > 0 ? ` · tarjeta $${caja.totalTarjeta.toFixed(2)}` : ""}
+              {(caja.totalCuentaCorriente ?? 0) > 0
+                ? ` · cuenta corriente $${(caja.totalCuentaCorriente ?? 0).toFixed(2)}`
+                : ""})
             </span>
           </div>
         )}
@@ -601,6 +652,25 @@ export default function VentaPage() {
 
       <section className="card">
         <h2>Venta actual</h2>
+        <div className="filter-row" style={{ marginBottom: "1rem" }}>
+          <label>
+            Cliente (opcional)
+            <select value={idClienteVenta} onChange={(e) => setIdClienteVenta(e.target.value)}>
+              <option value="">— Sin cliente —</option>
+              {clientes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre} ({c.numeroDocumento})
+                </option>
+              ))}
+            </select>
+          </label>
+          {clienteSeleccionado?.cuentaCorriente && (
+            <p className="muted total-inline" style={{ margin: 0 }}>
+              CC: saldo ${clienteSeleccionado.cuentaCorriente.saldo.toFixed(2)} · disponible{" "}
+              <strong>${clienteSeleccionado.cuentaCorriente.disponible.toFixed(2)}</strong>
+            </p>
+          )}
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
@@ -690,6 +760,16 @@ export default function VentaPage() {
               >
                 Tarjeta
               </button>
+              {puedeCuentaCorriente && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={saving}
+                  onClick={() => confirmarVenta("cuenta_corriente")}
+                >
+                  Cuenta corriente
+                </button>
+              )}
               <button
                 type="button"
                 className="btn btn-secondary"

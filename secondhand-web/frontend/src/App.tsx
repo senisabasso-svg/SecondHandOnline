@@ -9,7 +9,8 @@ import InformesPage from "./pages/InformesPage";
 import LoginPage from "./pages/LoginPage";
 import SuperadminPage from "./pages/SuperadminPage";
 import ProveedorLoginPage from "./pages/ProveedorLoginPage";
-import ProveedorPortalPage from "./pages/ProveedorPortalPage";
+import ClientesPage from "./pages/ClientesPage";
+import CuentasCorrientesPage from "./pages/CuentasCorrientesPage";
 
 function TenantLayout() {
   const { usuario, logout } = useAuth();
@@ -44,6 +45,12 @@ function TenantLayout() {
           </NavLink>
           <NavLink to="/proveedores" className={({ isActive }) => (isActive ? "active" : "")}>
             Proveedores
+          </NavLink>
+          <NavLink to="/clientes" className={({ isActive }) => (isActive ? "active" : "")}>
+            Clientes
+          </NavLink>
+          <NavLink to="/cuentas-corrientes" className={({ isActive }) => (isActive ? "active" : "")}>
+            Cuentas corrientes
           </NavLink>
           <NavLink to="/informes" className={({ isActive }) => (isActive ? "active" : "")}>
             Informes
@@ -147,6 +154,8 @@ export default function App() {
           <Route path="/" element={<VentaPage />} />
           <Route path="/productos" element={<ProductosPage />} />
           <Route path="/proveedores" element={<ProveedoresPage />} />
+          <Route path="/clientes" element={<ClientesPage />} />
+          <Route path="/cuentas-corrientes" element={<CuentasCorrientesPage />} />
           <Route path="/informes" element={<InformesPage />} />
         </Route>
       </Route>
