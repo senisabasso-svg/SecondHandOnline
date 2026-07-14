@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || "cambiar-en-produccion";
 
 app.use(cors({ origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim()) : true, credentials: true }));
-app.use(express.json());
+app.use(express.json({ limit: "8mb" }));
 
 function signToken(user) {
   return jwt.sign({ sub: user.id, rol: user.rol, idSecond: user.idSecond }, JWT_SECRET, { expiresIn: "7d" });
@@ -105,6 +105,45 @@ app.get("/api/public/tiendas", async (_, res) => {
       orderBy: { nombre: "asc" },
     });
     res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+const WEB_VISTA_MAX = 5;
+
+function mapWebVistaPublica(row) {
+  return {
+    orden: row.orden,
+    nombre: row.nombre,
+    precio: row.precio,
+    descripcion: row.descripcion,
+    imagen: row.imagen,
+  };
+}
+
+/** Landing: GET /api/public/web-vistas/:idSecond — sin auth. Devuelve hasta 5 prendas de vitrina. */
+app.get("/api/public/web-vistas/:idSecond", async (req, res) => {
+  try {
+    const idSecond = Number(req.params.idSecond);
+    if (!Number.isInteger(idSecond) || idSecond < 1) {
+      return res.status(400).json({ error: "idSecond inválido." });
+    }
+    const tienda = await prisma.secondHand.findFirst({
+      where: { id: idSecond, activo: true },
+      select: { id: true, nombre: true, logoUrl: true },
+    });
+    if (!tienda) return res.status(404).json({ error: "Tienda no encontrada o inactiva." });
+    const prendas = await prisma.webVistaPrenda.findMany({
+      where: { idSecond, orden: { gte: 1, lte: WEB_VISTA_MAX } },
+      orderBy: { orden: "asc" },
+    });
+    res.json({
+      idSecond: tienda.id,
+      tienda: { id: tienda.id, nombre: tienda.nombre, logoUrl: tienda.logoUrl },
+      prendas: prendas.map(mapWebVistaPublica),
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: String(e.message) });
@@ -311,6 +350,7 @@ app.use("/api/ventas", authOptional, requireAuth, requireTenant);
 app.use("/api/caja", authOptional, requireAuth, requireTenant);
 app.use("/api/informes", authOptional, requireAuth, requireTenant);
 app.use("/api/menu-precios", authOptional, requireAuth, requireTenant);
+app.use("/api/web-vistas", authOptional, requireAuth, requireTenant);
 
 const tw = (req) => ({ idSecond: req.user.idSecond });
 
@@ -1204,6 +1244,114 @@ app.post("/api/menu-precios", async (req, res) => {
       data: { nombre, precio: Number(precio), idSecond: req.user.idSecond },
     });
     res.status(201).json(row);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+function mapWebVistaAdmin(row) {
+  return {
+    id: row.id,
+    orden: row.orden,
+    nombre: row.nombre,
+    precio: row.precio,
+    descripcion: row.descripcion,
+    imagen: row.imagen,
+    updatedAt: row.updatedAt,
+  };
+}
+
+app.get("/api/web-vistas", async (req, res) => {
+  try {
+    const rows = await prisma.webVistaPrenda.findMany({
+      where: { idSecond: req.user.idSecond, orden: { gte: 1, lte: WEB_VISTA_MAX } },
+      orderBy: { orden: "asc" },
+    });
+    const byOrden = new Map(rows.map((r) => [r.orden, mapWebVistaAdmin(r)]));
+    const slots = [];
+    for (let orden = 1; orden <= WEB_VISTA_MAX; orden++) {
+      slots.push(byOrden.get(orden) || { id: null, orden, nombre: "", precio: 0, descripcion: "", imagen: null, updatedAt: null });
+    }
+    res.json({
+      idSecond: req.user.idSecond,
+      max: WEB_VISTA_MAX,
+      endpointPublico: `/api/public/web-vistas/${req.user.idSecond}`,
+      prendas: slots,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.put("/api/web-vistas/:orden", async (req, res) => {
+  try {
+    const orden = Number(req.params.orden);
+    if (!Number.isInteger(orden) || orden < 1 || orden > WEB_VISTA_MAX) {
+      return res.status(400).json({ error: `El orden debe ser un entero entre 1 y ${WEB_VISTA_MAX}.` });
+    }
+    const { nombre, precio, descripcion, imagen } = req.body;
+    const nombreNorm = typeof nombre === "string" ? nombre.trim() : "";
+    if (!nombreNorm) return res.status(400).json({ error: "El nombre es obligatorio." });
+    if (precio == null || Number.isNaN(Number(precio)) || Number(precio) < 0) {
+      return res.status(400).json({ error: "El precio debe ser un número mayor o igual a 0." });
+    }
+    let imagenVal = undefined;
+    if (imagen !== undefined) {
+      if (imagen == null || imagen === "") {
+        imagenVal = null;
+      } else if (typeof imagen !== "string" || !imagen.startsWith("data:image/")) {
+        return res.status(400).json({ error: "La imagen debe ser un data URL (data:image/...)." });
+      } else if (imagen.length > 6_500_000) {
+        return res.status(400).json({ error: "La imagen es demasiado grande (máx. ~5 MB)." });
+      } else {
+        imagenVal = imagen;
+      }
+    }
+    const desc = descripcion === undefined ? undefined : optionalStr(descripcion);
+    const idSecond = req.user.idSecond;
+    const existente = await prisma.webVistaPrenda.findUnique({
+      where: { idSecond_orden: { idSecond, orden } },
+    });
+    const data = {
+      nombre: nombreNorm,
+      precio: Number(precio),
+      ...(desc !== undefined ? { descripcion: desc } : {}),
+      ...(imagenVal !== undefined ? { imagen: imagenVal } : {}),
+    };
+    const row = existente
+      ? await prisma.webVistaPrenda.update({ where: { id: existente.id }, data })
+      : await prisma.webVistaPrenda.create({
+          data: {
+            idSecond,
+            orden,
+            nombre: nombreNorm,
+            precio: Number(precio),
+            descripcion: desc ?? null,
+            imagen: imagenVal ?? null,
+          },
+        });
+    res.json(mapWebVistaAdmin(row));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.delete("/api/web-vistas/:orden", async (req, res) => {
+  try {
+    const orden = Number(req.params.orden);
+    if (!Number.isInteger(orden) || orden < 1 || orden > WEB_VISTA_MAX) {
+      return res.status(400).json({ error: `El orden debe ser un entero entre 1 y ${WEB_VISTA_MAX}.` });
+    }
+    const existente = await prisma.webVistaPrenda.findUnique({
+      where: { idSecond_orden: { idSecond: req.user.idSecond, orden } },
+    });
+    if (existente) {
+      await prisma.webVistaPrenda.delete({ where: { id: existente.id } });
+    }
+    res.status(204).send();
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: String(e.message) });

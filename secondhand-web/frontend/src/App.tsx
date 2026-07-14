@@ -12,6 +12,7 @@ import ProveedorLoginPage from "./pages/ProveedorLoginPage";
 import ProveedorPortalPage from "./pages/ProveedorPortalPage";
 import ClientesPage from "./pages/ClientesPage";
 import CuentasCorrientesPage from "./pages/CuentasCorrientesPage";
+import WebVistasPage from "./pages/WebVistasPage";
 
 function TenantLayout() {
   const { usuario, logout } = useAuth();
@@ -55,6 +56,9 @@ function TenantLayout() {
           </NavLink>
           <NavLink to="/informes" className={({ isActive }) => (isActive ? "active" : "")}>
             Informes
+          </NavLink>
+          <NavLink to="/web-vistas" className={({ isActive }) => (isActive ? "active" : "")}>
+            Web vistas
           </NavLink>
         </nav>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
@@ -158,6 +162,7 @@ export default function App() {
           <Route path="/clientes" element={<ClientesPage />} />
           <Route path="/cuentas-corrientes" element={<CuentasCorrientesPage />} />
           <Route path="/informes" element={<InformesPage />} />
+          <Route path="/web-vistas" element={<WebVistasPage />} />
         </Route>
       </Route>
 

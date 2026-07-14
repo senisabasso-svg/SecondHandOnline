@@ -25,6 +25,7 @@ model SecondHand {
   clientes Cliente[]
   cuentasCorrientes CuentaCorriente[]
   cuentaCorrienteMovimientos CuentaCorrienteMovimiento[]
+  webVistaPrendas WebVistaPrenda[]
 
   @@map("second_hands")
 }
@@ -207,4 +208,22 @@ model CuentaCorrienteMovimiento {
   @@index([idCuenta])
   @@index([idSecond, fecha])
   @@map("cuenta_corriente_movimientos")
+}
+
+/// Hasta 5 prendas de vitrina para landing web (independientes del inventario).
+model WebVistaPrenda {
+  id          Int      @id @default(autoincrement())
+  idSecond    Int      @map("id_second")
+  orden       Int
+  nombre      String
+  precio      Float
+  descripcion String?
+  imagen      String?
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
+
+  @@unique([idSecond, orden])
+  @@index([idSecond])
+  @@map("web_vista_prendas")
 }

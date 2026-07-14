@@ -466,3 +466,66 @@ tr:hover td {
   object-fit: contain;
   display: block;
 }
+
+.web-vistas-endpoint {
+  background: var(--bg, #f8fafc);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  margin-top: 0.75rem;
+}
+
+.web-vistas-code {
+  display: block;
+  word-break: break-all;
+  font-size: 0.85rem;
+  padding: 0.4rem 0;
+}
+
+.web-vistas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.web-vistas-slot h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+}
+
+.web-vistas-slot label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.65rem;
+}
+
+.web-vistas-slot input,
+.web-vistas-slot textarea {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.web-vistas-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 160px;
+  margin-bottom: 0.85rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fafafa;
+}
+
+.web-vistas-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
