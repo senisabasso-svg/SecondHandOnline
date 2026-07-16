@@ -69,6 +69,7 @@ export default function InformesPage() {
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [filtro, setFiltro] = useState<string>("");
   const [mes, setMes] = useState<string>("");
+  const [medioPago, setMedioPago] = useState<string>("");
   const [totalProv, setTotalProv] = useState<number | null>(null);
   const [movimientosCaja, setMovimientosCaja] = useState<InformeMovimientosCaja | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,7 +88,10 @@ export default function InformesPage() {
     setMsg(null);
     try {
       const id = filtro ? Number(filtro) : null;
-      const qs = mes ? `?month=${encodeURIComponent(mes)}` : "";
+      const params = new URLSearchParams();
+      if (mes) params.set("month", mes);
+      if (medioPago) params.set("medioPago", medioPago);
+      const qs = params.toString() ? `?${params.toString()}` : "";
       const movQs = mes ? `?month=${encodeURIComponent(mes)}` : "";
       if (id) {
         const [rows, tot, mov] = await Promise.all([
@@ -112,7 +116,7 @@ export default function InformesPage() {
     } finally {
       setLoading(false);
     }
-  }, [filtro, mes]);
+  }, [filtro, mes, medioPago]);
 
   const exportarExcel = () => {
     if (informes.length === 0) {
@@ -144,8 +148,9 @@ export default function InformesPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     const labelMes = mes || "todos";
+    const labelPago = medioPago || "todos";
     a.href = url;
-    a.download = `informes_${labelMes}.csv`;
+    a.download = `informes_${labelMes}_${labelPago}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -186,6 +191,15 @@ export default function InformesPage() {
                   {p.nombre}
                 </option>
               ))}
+            </select>
+          </label>
+          <label>
+            Método de pago
+            <select value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
+              <option value="">Todos</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="cuenta_corriente">Cuenta Corriente</option>
             </select>
           </label>
           {filtro && totalProv !== null && (

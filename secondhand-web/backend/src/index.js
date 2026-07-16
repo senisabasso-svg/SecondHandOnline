@@ -1115,19 +1115,29 @@ app.get("/api/informes/movimientos-caja", async (req, res) => {
   }
 });
 
+/** Filtros de fecha y medio de pago para informes de ventas (VentaItem → venta). */
+function informesVentaWhere(query) {
+  const { month, from, to, medioPago } = query;
+  const venta = {};
+  if (month && typeof month === "string" && /^\d{4}-\d{2}$/.test(month)) {
+    const start = new Date(`${month}-01T00:00:00.000Z`);
+    const end = new Date(new Date(start).setMonth(start.getMonth() + 1));
+    venta.fecha = { gte: start, lt: end };
+  } else if (from || to) {
+    const gte = from ? new Date(String(from)) : undefined;
+    const lt = to ? new Date(String(to)) : undefined;
+    venta.fecha = { ...(gte ? { gte } : {}), ...(lt ? { lt } : {}) };
+  }
+  if (typeof medioPago === "string") {
+    const medio = medioPago.trim().toLowerCase();
+    if (MEDIOS_PAGO.has(medio)) venta.medioPago = medio;
+  }
+  return Object.keys(venta).length ? { venta } : {};
+}
+
 app.get("/api/informes", async (req, res) => {
   try {
-    const { month, from, to } = req.query;
-    let where = { ...tw(req) };
-    if (month && typeof month === "string" && /^\d{4}-\d{2}$/.test(month)) {
-      const start = new Date(`${month}-01T00:00:00.000Z`);
-      const end = new Date(new Date(start).setMonth(start.getMonth() + 1));
-      where = { ...where, venta: { fecha: { gte: start, lt: end } } };
-    } else if (from || to) {
-      const gte = from ? new Date(String(from)) : undefined;
-      const lt = to ? new Date(String(to)) : undefined;
-      where = { ...where, venta: { fecha: { ...(gte ? { gte } : {}), ...(lt ? { lt } : {}) } } };
-    }
+    const where = { ...tw(req), ...informesVentaWhere(req.query) };
     const items = await prisma.ventaItem.findMany({
       where,
       include: { venta: true, producto: { include: { proveedor: true } } },
@@ -1161,17 +1171,11 @@ app.get("/api/informes/proveedor/:id", async (req, res) => {
     const id = Number(req.params.id);
     const prov = await prisma.proveedor.findFirst({ where: { id, idSecond: req.user.idSecond } });
     if (!prov) return res.status(404).json({ error: "Proveedor no encontrado." });
-    const { month, from, to } = req.query;
-    let where = { idSecond: req.user.idSecond, producto: { idProveedor: id } };
-    if (month && typeof month === "string" && /^\d{4}-\d{2}$/.test(month)) {
-      const start = new Date(`${month}-01T00:00:00.000Z`);
-      const end = new Date(new Date(start).setMonth(start.getMonth() + 1));
-      where = { ...where, venta: { fecha: { gte: start, lt: end } } };
-    } else if (from || to) {
-      const gte = from ? new Date(String(from)) : undefined;
-      const lt = to ? new Date(String(to)) : undefined;
-      where = { ...where, venta: { fecha: { ...(gte ? { gte } : {}), ...(lt ? { lt } : {}) } } };
-    }
+    const where = {
+      idSecond: req.user.idSecond,
+      producto: { idProveedor: id },
+      ...informesVentaWhere(req.query),
+    };
     const items = await prisma.ventaItem.findMany({
       where,
       include: { venta: true, producto: { include: { proveedor: true } } },
@@ -1205,17 +1209,11 @@ app.get("/api/informes/proveedor/:id/total", async (req, res) => {
     const id = Number(req.params.id);
     const prov = await prisma.proveedor.findFirst({ where: { id, idSecond: req.user.idSecond } });
     if (!prov) return res.status(404).json({ error: "Proveedor no encontrado." });
-    const { month, from, to } = req.query;
-    let where = { idSecond: req.user.idSecond, producto: { idProveedor: id } };
-    if (month && typeof month === "string" && /^\d{4}-\d{2}$/.test(month)) {
-      const start = new Date(`${month}-01T00:00:00.000Z`);
-      const end = new Date(new Date(start).setMonth(start.getMonth() + 1));
-      where = { ...where, venta: { fecha: { gte: start, lt: end } } };
-    } else if (from || to) {
-      const gte = from ? new Date(String(from)) : undefined;
-      const lt = to ? new Date(String(to)) : undefined;
-      where = { ...where, venta: { fecha: { ...(gte ? { gte } : {}), ...(lt ? { lt } : {}) } } };
-    }
+    const where = {
+      idSecond: req.user.idSecond,
+      producto: { idProveedor: id },
+      ...informesVentaWhere(req.query),
+    };
     const agg = await prisma.ventaItem.aggregate({
       where,
       _sum: { precioUnitario: true },
