@@ -1135,31 +1135,39 @@ function informesVentaWhere(query) {
   return Object.keys(venta).length ? { venta } : {};
 }
 
+function mapInformeVentaItem(vi) {
+  return {
+    idVenta: vi.venta.id,
+    fechaVenta: vi.venta.fecha,
+    totalVenta: vi.venta.total,
+    medioPago: vi.venta.medioPago,
+    nombreCliente: vi.venta.cliente?.nombre ?? null,
+    idProducto: vi.producto.id,
+    descripcionProducto: vi.producto.descripcion,
+    tipoPrenda: vi.producto.tipoPrenda,
+    marca: vi.producto.marca,
+    color: vi.producto.color,
+    precioUnitario: vi.precioUnitario,
+    idProveedor: vi.producto.proveedor.id,
+    nombreProveedor: vi.producto.proveedor.nombre,
+    telefonoProveedor: vi.producto.proveedor.telefono,
+  };
+}
+
+const informesVentaInclude = {
+  venta: { include: { cliente: true } },
+  producto: { include: { proveedor: true } },
+};
+
 app.get("/api/informes", async (req, res) => {
   try {
     const where = { ...tw(req), ...informesVentaWhere(req.query) };
     const items = await prisma.ventaItem.findMany({
       where,
-      include: { venta: true, producto: { include: { proveedor: true } } },
+      include: informesVentaInclude,
       orderBy: [{ venta: { fecha: "desc" } }, { idVenta: "desc" }],
     });
-    res.json(
-      items.map((vi) => ({
-        idVenta: vi.venta.id,
-        fechaVenta: vi.venta.fecha,
-        totalVenta: vi.venta.total,
-        medioPago: vi.venta.medioPago,
-        idProducto: vi.producto.id,
-        descripcionProducto: vi.producto.descripcion,
-        tipoPrenda: vi.producto.tipoPrenda,
-        marca: vi.producto.marca,
-        color: vi.producto.color,
-        precioUnitario: vi.precioUnitario,
-        idProveedor: vi.producto.proveedor.id,
-        nombreProveedor: vi.producto.proveedor.nombre,
-        telefonoProveedor: vi.producto.proveedor.telefono,
-      }))
-    );
+    res.json(items.map(mapInformeVentaItem));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: String(e.message) });
@@ -1178,26 +1186,10 @@ app.get("/api/informes/proveedor/:id", async (req, res) => {
     };
     const items = await prisma.ventaItem.findMany({
       where,
-      include: { venta: true, producto: { include: { proveedor: true } } },
+      include: informesVentaInclude,
       orderBy: [{ venta: { fecha: "desc" } }, { idVenta: "desc" }],
     });
-    res.json(
-      items.map((vi) => ({
-        idVenta: vi.venta.id,
-        fechaVenta: vi.venta.fecha,
-        totalVenta: vi.venta.total,
-        medioPago: vi.venta.medioPago,
-        idProducto: vi.producto.id,
-        descripcionProducto: vi.producto.descripcion,
-        tipoPrenda: vi.producto.tipoPrenda,
-        marca: vi.producto.marca,
-        color: vi.producto.color,
-        precioUnitario: vi.precioUnitario,
-        idProveedor: vi.producto.proveedor.id,
-        nombreProveedor: vi.producto.proveedor.nombre,
-        telefonoProveedor: vi.producto.proveedor.telefono,
-      }))
-    );
+    res.json(items.map(mapInformeVentaItem));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: String(e.message) });

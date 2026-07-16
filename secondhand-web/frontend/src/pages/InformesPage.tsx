@@ -9,11 +9,17 @@ function labelMedioPago(m?: string | null) {
   return EM;
 }
 
+function labelCliente(nombre?: string | null) {
+  const n = typeof nombre === "string" ? nombre.trim() : "";
+  return n || "Cliente Final";
+}
+
 type Informe = {
   idVenta: number;
   fechaVenta: string;
   totalVenta: number;
   medioPago?: string | null;
+  nombreCliente?: string | null;
   idProducto: number;
   descripcionProducto: string;
   tipoPrenda: string | null;
@@ -126,6 +132,7 @@ export default function InformesPage() {
     const rows = informes.map((r) => ({
       Venta: r.idVenta,
       Fecha: new Date(r.fechaVenta).toLocaleString("es-AR"),
+      Cliente: labelCliente(r.nombreCliente),
       Pago: labelMedioPago(r.medioPago),
       Producto: r.descripcionProducto,
       Tipo: r.tipoPrenda ?? "",
@@ -256,6 +263,7 @@ export default function InformesPage() {
                 <tr>
                   <th>Venta</th>
                   <th>Fecha</th>
+                  <th>Cliente</th>
                   <th>Pago</th>
                   <th>Producto</th>
                   <th>Tipo</th>
@@ -271,6 +279,7 @@ export default function InformesPage() {
                   <tr key={`${r.idVenta}-${r.idProducto}-${i}`}>
                     <td>{r.idVenta}</td>
                     <td>{new Date(r.fechaVenta).toLocaleString("es")}</td>
+                    <td>{labelCliente(r.nombreCliente)}</td>
                     <td>{labelMedioPago(r.medioPago)}</td>
                     <td>{r.descripcionProducto}</td>
                     <td>{r.tipoPrenda ?? EM}</td>
