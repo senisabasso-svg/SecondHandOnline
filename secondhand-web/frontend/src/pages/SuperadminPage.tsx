@@ -10,6 +10,9 @@ export default function SuperadminPage() {
   const [nombreTienda, setNombreTienda] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [msgUser, setMsgUser] = useState<string | null>(null);
+  const [msgBackup, setMsgBackup] = useState<string | null>(null);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [backupFile, setBackupFile] = useState<File | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formEdit, setFormEdit] = useState({ nombre: "", activo: true, logoUrl: "" });
   const [saving, setSaving] = useState(false);
@@ -106,6 +109,73 @@ export default function SuperadminPage() {
       setMsgUser("Usuario creado correctamente.");
     } catch (e) {
       setMsgUser(String(e));
+    }
+  };
+
+  const exportarBackup = async () => {
+    setMsgBackup(null);
+    setBackupBusy(true);
+    try {
+      type BackupPayload = {
+        version: number;
+        exportedAt: string;
+        counts: Record<string, number>;
+        data: Record<string, unknown[]>;
+      };
+      const backup = await api<BackupPayload>("/api/super/backup");
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      a.href = url;
+      a.download = `secondhand-backup-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      const total = Object.values(backup.counts || {}).reduce((s, n) => s + Number(n || 0), 0);
+      setMsgBackup(`Backup exportado (${total} registros). Guardalo en un lugar seguro.`);
+    } catch (e) {
+      setMsgBackup(String(e));
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const importarBackup = async () => {
+    setMsgBackup(null);
+    if (!backupFile) {
+      setMsgBackup("Seleccioná un archivo JSON de backup.");
+      return;
+    }
+    const ok = window.confirm(
+      "Esto BORRARÁ todos los datos actuales del sistema y los reemplazará por el contenido del archivo.\n\n¿Continuar?"
+    );
+    if (!ok) return;
+    setBackupBusy(true);
+    try {
+      const text = await backupFile.text();
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        throw new Error("El archivo no es un JSON válido.");
+      }
+      const result = await api<{ ok: boolean; message?: string; counts?: Record<string, number> }>(
+        "/api/super/backup/import",
+        {
+          method: "POST",
+          body: JSON.stringify(parsed),
+        }
+      );
+      setBackupFile(null);
+      await load();
+      const total = Object.values(result.counts || {}).reduce((s, n) => s + Number(n || 0), 0);
+      setMsgBackup(result.message || `Importación completa (${total} registros).`);
+    } catch (e) {
+      setMsgBackup(String(e));
+    } finally {
+      setBackupBusy(false);
     }
   };
 
@@ -258,6 +328,56 @@ export default function SuperadminPage() {
           <button type="button" className="btn btn-secondary mt" onClick={load}>
             Actualizar lista
           </button>
+        </section>
+
+        <section className="card mt-lg">
+          <h2>Backup completo (JSON)</h2>
+          <p className="muted">
+            Exportá <strong>todos</strong> los datos del sistema (tiendas, usuarios, productos, ventas,
+            caja, clientes, cuentas corrientes, web vistas, etc.) a un archivo JSON para guardarlo como
+            respaldo manual o levantarlo en otro servidor.
+          </p>
+          <p className="muted">
+            La importación <strong>reemplaza todo</strong> lo existente. Las contraseñas se conservan
+            (hash bcrypt). Los archivos de logo en <code>/public</code> no van en el JSON (solo la
+            ruta <code>logoUrl</code>); copiá esos archivos aparte si hace falta.
+          </p>
+          <div className="form-actions" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={exportarBackup}
+              disabled={backupBusy}
+            >
+              {backupBusy ? "Procesando..." : "Exportar completo"}
+            </button>
+          </div>
+          <div className="form-grid mt" style={{ maxWidth: 520 }}>
+            <label>
+              Archivo de backup (.json)
+              <input
+                type="file"
+                accept="application/json,.json"
+                disabled={backupBusy}
+                onChange={(e) => setBackupFile(e.target.files?.[0] ?? null)}
+              />
+            </label>
+            <div className="form-actions">
+              <button
+                type="button"
+                className="btn btn-accent"
+                onClick={importarBackup}
+                disabled={backupBusy || !backupFile}
+              >
+                {backupBusy ? "Importando..." : "Importar completo"}
+              </button>
+            </div>
+          </div>
+          {msgBackup && (
+            <p className={msgBackup.toLowerCase().includes("error") || msgBackup.startsWith("Error") ? "err" : "ok"}>
+              {msgBackup}
+            </p>
+          )}
         </section>
 
         <section className="card mt-lg">

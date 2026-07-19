@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || "cambiar-en-produccion";
 
 app.use(cors({ origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim()) : true, credentials: true }));
-app.use(express.json({ limit: "8mb" }));
+app.use(express.json({ limit: "64mb" }));
 
 function signToken(user) {
   return jwt.sign({ sub: user.id, rol: user.rol, idSecond: user.idSecond }, JWT_SECRET, { expiresIn: "7d" });
@@ -337,6 +337,220 @@ app.post("/api/super/usuarios", authOptional, requireAuth, requireSuperadmin, as
     res.status(201).json({ id: row.id, email: row.email, nombre: row.nombre, rol: row.rol, idSecond: row.idSecond });
   } catch (e) {
     if (e.code === "P2002") return res.status(400).json({ error: "Ese correo ya estÃ¡ registrado." });
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+/** Backup JSON completo del sistema (todas las tiendas). Versión 1. */
+const BACKUP_VERSION = 1;
+const BACKUP_SPECS = [
+  {
+    key: "secondHands",
+    model: "secondHand",
+    table: "second_hands",
+    fields: ["id", "nombre", "activo", "createdAt", "logoUrl"],
+  },
+  {
+    key: "usuarios",
+    model: "usuario",
+    table: "usuarios",
+    fields: ["id", "idSecond", "email", "passwordHash", "nombre", "rol"],
+  },
+  {
+    key: "proveedores",
+    model: "proveedor",
+    table: "proveedores",
+    fields: ["id", "idSecond", "nombre", "telefono", "email"],
+  },
+  {
+    key: "clientes",
+    model: "cliente",
+    table: "clientes",
+    fields: ["id", "idSecond", "nombre", "tipoDocumento", "numeroDocumento"],
+  },
+  {
+    key: "menuPrecios",
+    model: "menuPrecio",
+    table: "menu_precios",
+    fields: ["id", "idSecond", "nombre", "precio"],
+  },
+  {
+    key: "webVistaPrendas",
+    model: "webVistaPrenda",
+    table: "web_vista_prendas",
+    fields: ["id", "idSecond", "orden", "nombre", "precio", "descripcion", "imagen", "updatedAt"],
+  },
+  {
+    key: "cajaSesiones",
+    model: "cajaSesion",
+    table: "caja_sesiones",
+    fields: ["id", "idSecond", "abiertaEn", "cerradaEn"],
+  },
+  {
+    key: "productos",
+    model: "producto",
+    table: "productos",
+    fields: [
+      "id",
+      "idSecond",
+      "descripcion",
+      "tipoPrenda",
+      "marca",
+      "color",
+      "condicion",
+      "precioVenta",
+      "talle",
+      "idProveedor",
+      "estado",
+      "cantidad",
+    ],
+  },
+  {
+    key: "cuentasCorrientes",
+    model: "cuentaCorriente",
+    table: "cuentas_corrientes",
+    fields: ["id", "idSecond", "idCliente", "limite", "saldo"],
+  },
+  {
+    key: "cajaMovimientos",
+    model: "cajaMovimiento",
+    table: "caja_movimientos",
+    fields: ["id", "idSecond", "idCaja", "tipo", "monto", "concepto", "fecha"],
+  },
+  {
+    key: "ventas",
+    model: "venta",
+    table: "ventas",
+    fields: ["id", "idSecond", "idCaja", "idCliente", "fecha", "total", "medioPago"],
+  },
+  {
+    key: "ventaItems",
+    model: "ventaItem",
+    table: "venta_items",
+    fields: ["id", "idSecond", "idVenta", "idProducto", "precioUnitario"],
+  },
+  {
+    key: "cuentaCorrienteMovimientos",
+    model: "cuentaCorrienteMovimiento",
+    table: "cuenta_corriente_movimientos",
+    fields: ["id", "idSecond", "idCuenta", "tipo", "monto", "concepto", "idVenta", "fecha"],
+  },
+];
+
+function pickBackupRow(row, fields) {
+  const out = {};
+  for (const f of fields) {
+    if (row[f] !== undefined) out[f] = row[f];
+  }
+  return out;
+}
+
+async function createManyChunked(delegate, rows, chunkSize = 500) {
+  if (!rows.length) return;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    await delegate.createMany({ data: rows.slice(i, i + chunkSize) });
+  }
+}
+
+async function resetAllBackupSequences(db) {
+  for (const spec of BACKUP_SPECS) {
+    const seq = `${spec.table}_id_seq`;
+    const [{ max }] = await db.$queryRawUnsafe(
+      `SELECT COALESCE(MAX(id), 0) AS max FROM "${spec.table}"`
+    );
+    const nextVal = Number(max) + 1;
+    await db.$executeRawUnsafe(`SELECT setval('${seq}', ${nextVal}, false)`);
+  }
+}
+
+async function wipeAllBackupData(db) {
+  await db.cuentaCorrienteMovimiento.deleteMany();
+  await db.ventaItem.deleteMany();
+  await db.venta.deleteMany();
+  await db.cajaMovimiento.deleteMany();
+  await db.cuentaCorriente.deleteMany();
+  await db.producto.deleteMany();
+  await db.cajaSesion.deleteMany();
+  await db.cliente.deleteMany();
+  await db.proveedor.deleteMany();
+  await db.menuPrecio.deleteMany();
+  await db.webVistaPrenda.deleteMany();
+  await db.usuario.deleteMany();
+  await db.secondHand.deleteMany();
+}
+
+app.get("/api/super/backup", authOptional, requireAuth, requireSuperadmin, async (_req, res) => {
+  try {
+    const data = {};
+    const counts = {};
+    for (const spec of BACKUP_SPECS) {
+      const rows = await prisma[spec.model].findMany({ orderBy: { id: "asc" } });
+      data[spec.key] = rows.map((r) => pickBackupRow(r, spec.fields));
+      counts[spec.key] = data[spec.key].length;
+    }
+    res.json({
+      version: BACKUP_VERSION,
+      exportedAt: new Date().toISOString(),
+      app: "secondhand-web",
+      note: "Incluye passwordHash (bcrypt). Los logos de /public no viajan en este archivo; solo logoUrl.",
+      counts,
+      data,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.post("/api/super/backup/import", authOptional, requireAuth, requireSuperadmin, async (req, res) => {
+  try {
+    const body = req.body;
+    if (!body || typeof body !== "object") {
+      return res.status(400).json({ error: "JSON de backup inválido." });
+    }
+    if (body.version !== BACKUP_VERSION) {
+      return res.status(400).json({
+        error: `Versión de backup no soportada (se espera ${BACKUP_VERSION}).`,
+      });
+    }
+    const payload = body.data;
+    if (!payload || typeof payload !== "object") {
+      return res.status(400).json({ error: "El backup no tiene la sección data." });
+    }
+
+    const prepared = {};
+    const counts = {};
+    for (const spec of BACKUP_SPECS) {
+      const raw = Array.isArray(payload[spec.key]) ? payload[spec.key] : [];
+      prepared[spec.key] = raw.map((r) => pickBackupRow(r, spec.fields));
+      counts[spec.key] = prepared[spec.key].length;
+    }
+
+    if (!prepared.secondHands.length && !prepared.usuarios.length) {
+      return res.status(400).json({
+        error: "El backup no contiene tiendas ni usuarios. Abortado para no dejar el sistema vacío.",
+      });
+    }
+
+    await prisma.$transaction(
+      async (tx) => {
+        await wipeAllBackupData(tx);
+        for (const spec of BACKUP_SPECS) {
+          await createManyChunked(tx[spec.model], prepared[spec.key]);
+        }
+        await resetAllBackupSequences(tx);
+      },
+      { timeout: 120_000, maxWait: 30_000 }
+    );
+
+    res.json({
+      ok: true,
+      importedAt: new Date().toISOString(),
+      counts,
+      message: "Backup importado. Se reemplazaron todos los datos del sistema.",
+    });
+  } catch (e) {
     console.error(e);
     res.status(500).json({ error: String(e.message) });
   }
