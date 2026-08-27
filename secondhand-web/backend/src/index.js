@@ -72,7 +72,7 @@ app.get("/api/tienda", authOptional, requireAuth, requireTenant, async (req, res
   try {
     const sh = await prisma.secondHand.findUnique({
       where: { id: req.user.idSecond },
-      select: { id: true, nombre: true, logoUrl: true },
+      select: { id: true, nombre: true, logoUrl: true, webVistasActivo: true, vivoTiktokActivo: true },
     });
     if (!sh) return res.status(404).json({ error: "Tienda no encontrada." });
     res.json(sh);
@@ -303,11 +303,13 @@ app.post("/api/super/second-hands", authOptional, requireAuth, requireSuperadmin
 app.put("/api/super/second-hands/:id", authOptional, requireAuth, requireSuperadmin, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { nombre, activo, logoUrl } = req.body;
+    const { nombre, activo, logoUrl, webVistasActivo, vivoTiktokActivo } = req.body;
     const updateData = {};
     if (nombre !== undefined) updateData.nombre = nombre?.trim() || null;
     if (activo !== undefined) updateData.activo = Boolean(activo);
     if (logoUrl !== undefined) updateData.logoUrl = logoUrl?.trim() || null;
+    if (webVistasActivo !== undefined) updateData.webVistasActivo = Boolean(webVistasActivo);
+    if (vivoTiktokActivo !== undefined) updateData.vivoTiktokActivo = Boolean(vivoTiktokActivo);
     const row = await prisma.secondHand.update({ where: { id }, data: updateData });
     res.json(row);
   } catch (e) {
@@ -350,7 +352,7 @@ const BACKUP_SPECS = [
     key: "secondHands",
     model: "secondHand",
     table: "second_hands",
-    fields: ["id", "nombre", "activo", "createdAt", "logoUrl"],
+    fields: ["id", "nombre", "activo", "webVistasActivo", "vivoTiktokActivo", "createdAt", "logoUrl"],
   },
   {
     key: "usuarios",
@@ -565,10 +567,42 @@ app.use("/api/ventas", authOptional, requireAuth, requireTenant);
 app.use("/api/caja", authOptional, requireAuth, requireTenant);
 app.use("/api/informes", authOptional, requireAuth, requireTenant);
 app.use("/api/menu-precios", authOptional, requireAuth, requireTenant);
-app.use("/api/web-vistas", authOptional, requireAuth, requireTenant);
-app.use("/api/vivo", authOptional, requireAuth, requireTenant);
+app.use("/api/web-vistas", authOptional, requireAuth, requireTenant, requireModuloWebVistas);
+app.use("/api/vivo", authOptional, requireAuth, requireTenant, requireModuloVivoTiktok);
 
 const tw = (req) => ({ idSecond: req.user.idSecond });
+
+async function requireModuloWebVistas(req, res, next) {
+  try {
+    const sh = await prisma.secondHand.findUnique({
+      where: { id: req.user.idSecond },
+      select: { webVistasActivo: true },
+    });
+    if (!sh?.webVistasActivo) {
+      return res.status(403).json({ error: "La sección Web vistas no está habilitada para esta tienda." });
+    }
+    next();
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+}
+
+async function requireModuloVivoTiktok(req, res, next) {
+  try {
+    const sh = await prisma.secondHand.findUnique({
+      where: { id: req.user.idSecond },
+      select: { vivoTiktokActivo: true },
+    });
+    if (!sh?.vivoTiktokActivo) {
+      return res.status(403).json({ error: "La sección Vivo TikTok no está habilitada para esta tienda." });
+    }
+    next();
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: String(e.message) });
+  }
+}
 
 const MEDIOS_PAGO = new Set(["efectivo", "tarjeta", "cuenta_corriente"]);
 const TIPOS_MOVIMIENTO_CAJA = new Set(["ingreso", "egreso"]);

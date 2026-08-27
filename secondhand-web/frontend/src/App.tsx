@@ -1,5 +1,5 @@
-import { Routes, Route, NavLink, Navigate, Outlet } from "react-router-dom";
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Routes, Route, NavLink, Navigate, Outlet, useOutletContext } from "react-router-dom";
+import { Suspense, lazy, useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "./context/AuthContext";
 import { api } from "./api";
 import VentaPage from "./pages/VentaPage";
@@ -18,13 +18,21 @@ const VivoListPage = lazy(() => import("./pages/vivo/VivoListPage"));
 const VivoSessionPage = lazy(() => import("./pages/vivo/VivoSessionPage"));
 const VivoCierrePage = lazy(() => import("./pages/vivo/VivoCierrePage"));
 
+type TiendaInfo = {
+  id: number;
+  nombre: string;
+  logoUrl?: string | null;
+  webVistasActivo: boolean;
+  vivoTiktokActivo: boolean;
+};
+
 function TenantLayout() {
   const { usuario, logout } = useAuth();
-  const [tienda, setTienda] = useState<{ id: number; nombre: string; logoUrl?: string | null } | null>(null);
+  const [tienda, setTienda] = useState<TiendaInfo | null>(null);
 
   useEffect(() => {
     if (!usuario?.idSecond) return;
-    api<{ id: number; nombre: string; logoUrl?: string | null }>("/api/tienda")
+    api<TiendaInfo>("/api/tienda")
       .then(setTienda)
       .catch(() => setTienda(null));
   }, [usuario?.idSecond]);
@@ -61,12 +69,16 @@ function TenantLayout() {
           <NavLink to="/informes" className={({ isActive }) => (isActive ? "active" : "")}>
             Informes
           </NavLink>
-          <NavLink to="/web-vistas" className={({ isActive }) => (isActive ? "active" : "")}>
-            Web vistas
-          </NavLink>
-          <NavLink to="/vivo" className={({ isActive }) => (isActive ? "active" : "")}>
-            Vivo TikTok
-          </NavLink>
+          {tienda?.webVistasActivo ? (
+            <NavLink to="/web-vistas" className={({ isActive }) => (isActive ? "active" : "")}>
+              Web vistas
+            </NavLink>
+          ) : null}
+          {tienda?.vivoTiktokActivo ? (
+            <NavLink to="/vivo" className={({ isActive }) => (isActive ? "active" : "")}>
+              Vivo TikTok
+            </NavLink>
+          ) : null}
         </nav>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
           <span className="muted" style={{ fontSize: "0.85rem" }}>
@@ -79,7 +91,7 @@ function TenantLayout() {
         </div>
       </header>
       <main className="main">
-        <Outlet />
+        <Outlet context={{ tienda }} />
       </main>
     </div>
   );
@@ -150,6 +162,21 @@ function SuperadminRoute() {
   return <SuperadminPage />;
 }
 
+function RequireModulo({ modulo, children }: { modulo: "webVistas" | "vivoTiktok"; children: ReactNode }) {
+  const { tienda } = useOutletContext<{ tienda: TiendaInfo | null }>();
+  if (!tienda) return <p className="muted">Cargando...</p>;
+  const ok = modulo === "webVistas" ? tienda.webVistasActivo : tienda.vivoTiktokActivo;
+  if (!ok) {
+    return (
+      <div className="page card">
+        <h2>Sección no disponible</h2>
+        <p className="muted">Esta función no está habilitada para tu tienda. Contactá al administrador.</p>
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -169,29 +196,42 @@ export default function App() {
           <Route path="/clientes" element={<ClientesPage />} />
           <Route path="/cuentas-corrientes" element={<CuentasCorrientesPage />} />
           <Route path="/informes" element={<InformesPage />} />
-          <Route path="/web-vistas" element={<WebVistasPage />} />
+          <Route
+            path="/web-vistas"
+            element={
+              <RequireModulo modulo="webVistas">
+                <WebVistasPage />
+              </RequireModulo>
+            }
+          />
           <Route
             path="/vivo"
             element={
-              <Suspense fallback={<p className="muted">Cargando...</p>}>
-                <VivoListPage />
-              </Suspense>
+              <RequireModulo modulo="vivoTiktok">
+                <Suspense fallback={<p className="muted">Cargando...</p>}>
+                  <VivoListPage />
+                </Suspense>
+              </RequireModulo>
             }
           />
           <Route
             path="/vivo/:id/cierre"
             element={
-              <Suspense fallback={<p className="muted">Cargando...</p>}>
-                <VivoCierrePage />
-              </Suspense>
+              <RequireModulo modulo="vivoTiktok">
+                <Suspense fallback={<p className="muted">Cargando...</p>}>
+                  <VivoCierrePage />
+                </Suspense>
+              </RequireModulo>
             }
           />
           <Route
             path="/vivo/:id"
             element={
-              <Suspense fallback={<p className="muted">Cargando...</p>}>
-                <VivoSessionPage />
-              </Suspense>
+              <RequireModulo modulo="vivoTiktok">
+                <Suspense fallback={<p className="muted">Cargando...</p>}>
+                  <VivoSessionPage />
+                </Suspense>
+              </RequireModulo>
             }
           />
         </Route>

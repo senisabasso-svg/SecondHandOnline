@@ -2,7 +2,15 @@
 import { api } from "../api";
 import { useAuth } from "../context/AuthContext";
 
-type SecondHandRow = { id: number; nombre: string; activo: boolean; createdAt: string; logoUrl: string | null };
+type SecondHandRow = {
+  id: number;
+  nombre: string;
+  activo: boolean;
+  webVistasActivo: boolean;
+  vivoTiktokActivo: boolean;
+  createdAt: string;
+  logoUrl: string | null;
+};
 
 export default function SuperadminPage() {
   const { usuario, logout } = useAuth();
@@ -14,7 +22,13 @@ export default function SuperadminPage() {
   const [backupBusy, setBackupBusy] = useState(false);
   const [backupFile, setBackupFile] = useState<File | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [formEdit, setFormEdit] = useState({ nombre: "", activo: true, logoUrl: "" });
+  const [formEdit, setFormEdit] = useState({
+    nombre: "",
+    activo: true,
+    logoUrl: "",
+    webVistasActivo: true,
+    vivoTiktokActivo: true,
+  });
   const [saving, setSaving] = useState(false);
   const [formUser, setFormUser] = useState({
     email: "",
@@ -55,12 +69,18 @@ export default function SuperadminPage() {
 
   const iniciarEdicion = (t: SecondHandRow) => {
     setEditingId(t.id);
-    setFormEdit({ nombre: t.nombre, activo: t.activo, logoUrl: t.logoUrl || "" });
+    setFormEdit({
+      nombre: t.nombre,
+      activo: t.activo,
+      logoUrl: t.logoUrl || "",
+      webVistasActivo: t.webVistasActivo,
+      vivoTiktokActivo: t.vivoTiktokActivo,
+    });
   };
 
   const cancelarEdicion = () => {
     setEditingId(null);
-    setFormEdit({ nombre: "", activo: true, logoUrl: "" });
+    setFormEdit({ nombre: "", activo: true, logoUrl: "", webVistasActivo: true, vivoTiktokActivo: true });
   };
 
   const guardarEdicion = async (e: React.FormEvent) => {
@@ -75,6 +95,8 @@ export default function SuperadminPage() {
           nombre: formEdit.nombre.trim(),
           activo: formEdit.activo,
           logoUrl: formEdit.logoUrl.trim() || null,
+          webVistasActivo: formEdit.webVistasActivo,
+          vivoTiktokActivo: formEdit.vivoTiktokActivo,
         }),
       });
       await load();
@@ -226,6 +248,8 @@ export default function SuperadminPage() {
                   <th>Logo</th>
                   <th>Nombre</th>
                   <th>Activa</th>
+                  <th>Web vistas</th>
+                  <th>Vivo TikTok</th>
                   <th>Alta</th>
                   <th></th>
                 </tr>
@@ -238,7 +262,7 @@ export default function SuperadminPage() {
                         <td>
                           <strong>{t.id}</strong>
                         </td>
-                        <td colSpan={5}>
+                        <td colSpan={7}>
                           <form onSubmit={guardarEdicion} className="form-grid" style={{ maxWidth: 600, margin: "0.5rem 0" }}>
                             <label>
                               Nombre
@@ -255,6 +279,22 @@ export default function SuperadminPage() {
                                 onChange={(e) => setFormEdit((f) => ({ ...f, logoUrl: e.target.value }))}
                                 placeholder="/logos/tienda.png"
                               />
+                            </label>
+                            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <input
+                                type="checkbox"
+                                checked={formEdit.webVistasActivo}
+                                onChange={(e) => setFormEdit((f) => ({ ...f, webVistasActivo: e.target.checked }))}
+                              />
+                              Web vistas habilitado
+                            </label>
+                            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <input
+                                type="checkbox"
+                                checked={formEdit.vivoTiktokActivo}
+                                onChange={(e) => setFormEdit((f) => ({ ...f, vivoTiktokActivo: e.target.checked }))}
+                              />
+                              Vivo TikTok habilitado
                             </label>
                             <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                               <input
@@ -311,6 +351,8 @@ export default function SuperadminPage() {
                         </td>
                         <td>{t.nombre}</td>
                         <td>{t.activo ? "Sí" : "No"}</td>
+                        <td>{t.webVistasActivo ? "Sí" : "No"}</td>
+                        <td>{t.vivoTiktokActivo ? "Sí" : "No"}</td>
                         <td>{new Date(t.createdAt).toLocaleString("es")}</td>
                         <td>
                           <button type="button" className="btn btn-ghost" onClick={() => iniciarEdicion(t)}>

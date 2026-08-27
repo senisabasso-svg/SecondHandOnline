@@ -8,11 +8,13 @@ datasource db {
 }
 
 model SecondHand {
-  id        Int      @id @default(autoincrement())
-  nombre    String
-  activo    Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  logoUrl   String?  @map("logo_url")
+  id               Int      @id @default(autoincrement())
+  nombre           String
+  activo           Boolean  @default(true)
+  webVistasActivo  Boolean  @default(true) @map("web_vistas_activo")
+  vivoTiktokActivo Boolean  @default(true) @map("vivo_tiktok_activo")
+  createdAt        DateTime @default(now()) @map("created_at")
+  logoUrl          String?  @map("logo_url")
 
   usuarios    Usuario[]
   proveedores Proveedor[]
