@@ -1,5 +1,5 @@
 import { Routes, Route, NavLink, Navigate, Outlet } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { useAuth } from "./context/AuthContext";
 import { api } from "./api";
 import VentaPage from "./pages/VentaPage";
@@ -13,6 +13,10 @@ import ProveedorPortalPage from "./pages/ProveedorPortalPage";
 import ClientesPage from "./pages/ClientesPage";
 import CuentasCorrientesPage from "./pages/CuentasCorrientesPage";
 import WebVistasPage from "./pages/WebVistasPage";
+
+const VivoListPage = lazy(() => import("./pages/vivo/VivoListPage"));
+const VivoSessionPage = lazy(() => import("./pages/vivo/VivoSessionPage"));
+const VivoCierrePage = lazy(() => import("./pages/vivo/VivoCierrePage"));
 
 function TenantLayout() {
   const { usuario, logout } = useAuth();
@@ -59,6 +63,9 @@ function TenantLayout() {
           </NavLink>
           <NavLink to="/web-vistas" className={({ isActive }) => (isActive ? "active" : "")}>
             Web vistas
+          </NavLink>
+          <NavLink to="/vivo" className={({ isActive }) => (isActive ? "active" : "")}>
+            Vivo TikTok
           </NavLink>
         </nav>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
@@ -163,6 +170,30 @@ export default function App() {
           <Route path="/cuentas-corrientes" element={<CuentasCorrientesPage />} />
           <Route path="/informes" element={<InformesPage />} />
           <Route path="/web-vistas" element={<WebVistasPage />} />
+          <Route
+            path="/vivo"
+            element={
+              <Suspense fallback={<p className="muted">Cargando...</p>}>
+                <VivoListPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/vivo/:id/cierre"
+            element={
+              <Suspense fallback={<p className="muted">Cargando...</p>}>
+                <VivoCierrePage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/vivo/:id"
+            element={
+              <Suspense fallback={<p className="muted">Cargando...</p>}>
+                <VivoSessionPage />
+              </Suspense>
+            }
+          />
         </Route>
       </Route>
 

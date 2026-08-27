@@ -1,0 +1,296 @@
+.vivo-wrap {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.vivo-live-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.vivo-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #b91c1c;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.vivo-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: vivo-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes vivo-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.vivo-timer {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.vivo-stats {
+  font-size: 0.85rem;
+  color: var(--muted);
+  flex: 1;
+}
+
+.vivo-on-air {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.15);
+}
+
+.vivo-codigo {
+  font-size: 3.5rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--header);
+  border: none;
+  background: transparent;
+  width: 100%;
+  font-family: inherit;
+  padding: 0;
+}
+
+.vivo-codigo:focus {
+  outline: 2px dashed var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.vivo-hint {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 0.25rem;
+}
+
+.vivo-empty {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.vivo-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.vivo-actions .btn {
+  padding: 1rem;
+  font-size: 1.05rem;
+}
+
+.vivo-reservas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.vivo-reserva-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  background: #fce7f3;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.9rem;
+}
+
+.vivo-reserva-chip button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--accent-dark);
+  padding: 0 0.15rem;
+}
+
+.vivo-search {
+  margin: 1.25rem 0 0.75rem;
+}
+
+.vivo-search input {
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: inherit;
+}
+
+.vivo-catalogo-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.vivo-catalogo-item:last-child {
+  border-bottom: none;
+}
+
+.vivo-ya-mostrada {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.vivo-badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.vivo-badge-en_pantalla {
+  background: #fce7f3;
+  color: var(--header);
+}
+
+.vivo-badge-reservada {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.vivo-badge-vendida {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.vivo-badge-liberada {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.vivo-toast {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #4a044e;
+  color: white;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  z-index: 100;
+  max-width: 90vw;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.vivo-howto {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: var(--bg);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.vivo-howto ol {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.vivo-howto li {
+  margin-bottom: 0.5rem;
+}
+
+.vivo-cierre-grupo {
+  margin-bottom: 1rem;
+}
+
+.vivo-cierre-grupo h3 {
+  margin: 0 0 0.5rem;
+}
+
+.vivo-precio-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.vivo-precio-row input[type="number"] {
+  width: 7rem;
+  padding: 0.5rem;
+  font-size: 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+}
+
+.vivo-at-input {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  margin-top: 0.75rem;
+}
+
+.vivo-start-btn {
+  width: 100%;
+  padding: 1.1rem !important;
+  font-size: 1.15rem !important;
+  margin: 1rem 0;
+}
+
+.vivo-alert {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+}
+
+body.vivo-compact-header .nav {
+  display: none;
+}
+
+body.vivo-compact-header .header {
+  padding: 0.35rem 0.75rem;
+}
+
+body.vivo-compact-header .logo {
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  .vivo-codigo {
+    font-size: 3rem;
+  }
+}

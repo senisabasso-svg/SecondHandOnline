@@ -26,6 +26,7 @@ model SecondHand {
   cuentasCorrientes CuentaCorriente[]
   cuentaCorrienteMovimientos CuentaCorrienteMovimiento[]
   webVistaPrendas WebVistaPrenda[]
+  vivos           Vivo[]
 
   @@map("second_hands")
 }
@@ -74,6 +75,7 @@ model Producto {
   secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
   proveedor  Proveedor  @relation(fields: [idProveedor], references: [id])
   ventaItems VentaItem[]
+  vivoItems  VivoItem[]
 
   @@index([idSecond])
   @@map("productos")
@@ -226,4 +228,59 @@ model WebVistaPrenda {
   @@unique([idSecond, orden])
   @@index([idSecond])
   @@map("web_vista_prendas")
+}
+
+model Vivo {
+  id         Int       @id @default(autoincrement())
+  idSecond   Int       @map("id_second")
+  titulo     String?
+  plataforma String    @default("tiktok")
+  inicio     DateTime  @default(now())
+  fin        DateTime?
+  estado     String    @default("abierto")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
+  items      VivoItem[]
+
+  @@index([idSecond])
+  @@index([idSecond, estado])
+  @@map("vivos")
+}
+
+model VivoItem {
+  id               Int      @id @default(autoincrement())
+  vivoId           Int      @map("vivo_id")
+  productoId       Int?     @map("producto_id")
+  codigo           String   @db.VarChar(16)
+  precioVivo       Float    @map("precio_vivo")
+  descripcionLibre String?  @map("descripcion_libre")
+  estado           String   @default("en_pantalla")
+  orden            Int
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  vivo     Vivo          @relation(fields: [vivoId], references: [id], onDelete: Cascade)
+  producto Producto?     @relation(fields: [productoId], references: [id], onDelete: SetNull)
+  reservas VivoReserva[]
+
+  @@unique([vivoId, codigo])
+  @@index([vivoId])
+  @@index([vivoId, estado])
+  @@index([productoId])
+  @@map("vivo_items")
+}
+
+model VivoReserva {
+  id         Int      @id @default(autoincrement())
+  vivoItemId Int      @map("vivo_item_id")
+  usuario    String   @db.VarChar(64)
+  orden      Int
+  estado     String   @default("pendiente")
+  ventaId    Int?     @map("venta_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  vivoItem VivoItem @relation(fields: [vivoItemId], references: [id], onDelete: Cascade)
+
+  @@index([vivoItemId])
+  @@map("vivo_reservas")
 }

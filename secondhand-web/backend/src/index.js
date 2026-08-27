@@ -3,6 +3,7 @@ import cors from "cors";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
+import { mountVivoRoutes } from "./routes/vivo.js";
 
 const prisma = new PrismaClient();
 const app = express();
@@ -565,6 +566,7 @@ app.use("/api/caja", authOptional, requireAuth, requireTenant);
 app.use("/api/informes", authOptional, requireAuth, requireTenant);
 app.use("/api/menu-precios", authOptional, requireAuth, requireTenant);
 app.use("/api/web-vistas", authOptional, requireAuth, requireTenant);
+app.use("/api/vivo", authOptional, requireAuth, requireTenant);
 
 const tw = (req) => ({ idSecond: req.user.idSecond });
 
@@ -1561,5 +1563,7 @@ app.delete("/api/web-vistas/:orden", async (req, res) => {
     res.status(500).json({ error: String(e.message) });
   }
 });
+
+mountVivoRoutes(app, { prisma });
 
 app.listen(PORT, () => console.log(`API SecondHand en http://localhost:${PORT}`));
