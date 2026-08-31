@@ -30,7 +30,18 @@ function stockRestante(p: Producto, cart: Producto[]) {
   return Math.max(0, (p.cantidad ?? 0) - unidadesEnCarrito(cart, p.id));
 }
 
-type CartLine = Producto;
+type CartLine = Producto & { descuentoPct: number };
+
+function clampPct(n: number) {
+  if (!Number.isFinite(n) || n < 0) return 0;
+  if (n > 100) return 100;
+  return n;
+}
+
+function precioConDescuento(precioLista: number, descuentoPct: number) {
+  const pct = clampPct(descuentoPct);
+  return Math.round(precioLista * (1 - pct / 100) * 100) / 100;
+}
 
 export type MedioPago = "efectivo" | "tarjeta" | "cuenta_corriente";
 
@@ -51,7 +62,7 @@ type ClienteVenta = {
 export type TicketData = {
   ventaId: number;
   fechaLabel: string;
-  lines: { descripcion: string; precioVenta: number }[];
+  lines: { descripcion: string; precioVenta: number; precioLista?: number; descuentoPct?: number }[];
   total: number;
   medioPago?: MedioPago | null;
   tienda?: { nombre: string; logoUrl?: string } | null;
@@ -123,6 +134,7 @@ export default function VentaPage() {
   const [modalPago, setModalPago] = useState(false);
   const [clientes, setClientes] = useState<ClienteVenta[]>([]);
   const [idClienteVenta, setIdClienteVenta] = useState<string>("");
+  const [descuentoTotalPct, setDescuentoTotalPct] = useState(0);
 
   const loadCaja = useCallback(async () => {
     setLoadingCaja(true);
@@ -260,7 +272,7 @@ export default function VentaPage() {
       setMsg("No hay más unidades disponibles de este producto.");
       return;
     }
-    setCart((c) => [...c, p]);
+    setCart((c) => [...c, { ...p, descuentoPct: 0 }]);
     if (!esProductoConStock(p)) {
       setDisponibles((d) => d.filter((x) => x.id !== p.id));
     }
@@ -275,7 +287,30 @@ export default function VentaPage() {
     }
   };
 
-  const total = cart.reduce((s, x) => s + x.precioVenta, 0);
+  const setDescuentoLinea = (index: number, pct: number) => {
+    setCart((c) =>
+      c.map((line, i) => (i === index ? { ...line, descuentoPct: clampPct(pct) } : line))
+    );
+  };
+
+  const subtotalSinDescTotal = useMemo(
+    () => cart.reduce((s, x) => s + precioConDescuento(x.precioVenta, x.descuentoPct), 0),
+    [cart]
+  );
+
+  const preciosFinalesLineas = useMemo(() => {
+    if (cart.length === 0) return [] as number[];
+    const factorTotal = 1 - clampPct(descuentoTotalPct) / 100;
+    return cart.map((x) => {
+      const despuesLinea = precioConDescuento(x.precioVenta, x.descuentoPct);
+      return Math.round(despuesLinea * factorTotal * 100) / 100;
+    });
+  }, [cart, descuentoTotalPct]);
+
+  const total = useMemo(
+    () => preciosFinalesLineas.reduce((s, n) => s + n, 0),
+    [preciosFinalesLineas]
+  );
 
   const printTicket = (data: TicketData) => {
     const w = window.open("", "_blank");
@@ -284,10 +319,15 @@ export default function VentaPage() {
       return;
     }
     const rows = data.lines
-      .map(
-        (l) =>
-          `<tr><td style="padding:4px 0;border-bottom:1px solid #ddd">${escapeHtml(l.descripcion)}</td><td style="text-align:right;padding:4px 0;border-bottom:1px solid #ddd">$${l.precioVenta.toFixed(2)}</td></tr>`
-      )
+      .map((l) => {
+        const descExtra =
+          l.descuentoPct && l.descuentoPct > 0
+            ? ` <span style="color:#666;font-size:11px">(-${l.descuentoPct}%${
+                l.precioLista != null ? ` de $${l.precioLista.toFixed(2)}` : ""
+              })</span>`
+            : "";
+        return `<tr><td style="padding:4px 0;border-bottom:1px solid #ddd">${escapeHtml(l.descripcion)}${descExtra}</td><td style="text-align:right;padding:4px 0;border-bottom:1px solid #ddd">$${l.precioVenta.toFixed(2)}</td></tr>`;
+      })
       .join("");
     const titulo = escapeHtml(data.tienda?.nombre || "SecondHand") + " — Ticket de venta";
     const gracias = "\u00a1Gracias por su compra!";
@@ -327,11 +367,19 @@ export default function VentaPage() {
     setModalPago(false);
     setSaving(true);
     setMsg(null);
-    const snapshot = cart.map((p) => ({
-      descripcion: p.descripcion,
-      precioVenta: p.precioVenta,
-    }));
-    const totalVenta = cart.reduce((s, x) => s + x.precioVenta, 0);
+    const precios = preciosFinalesLineas;
+    const snapshot = cart.map((p, i) => {
+      const precioFinal = precios[i] ?? precioConDescuento(p.precioVenta, p.descuentoPct);
+      const pctEfectivo =
+        p.precioVenta > 0 ? Math.round((1 - precioFinal / p.precioVenta) * 1000) / 10 : 0;
+      return {
+        descripcion: p.descripcion,
+        precioVenta: precioFinal,
+        precioLista: p.precioVenta,
+        descuentoPct: pctEfectivo > 0 ? pctEfectivo : undefined,
+      };
+    });
+    const totalVenta = precios.reduce((s, n) => s + n, 0);
     if (medioPago === "cuenta_corriente") {
       const disp = clienteSeleccionado?.cuentaCorriente?.disponible ?? 0;
       if (!clienteSeleccionado?.tieneCuentaCorriente) {
@@ -348,9 +396,9 @@ export default function VentaPage() {
     try {
       const body: { medioPago: MedioPago; items: { idProducto: number; precioUnitario: number }[]; idCliente?: number } = {
         medioPago,
-        items: cart.map((p) => ({
+        items: cart.map((p, i) => ({
           idProducto: p.id,
-          precioUnitario: p.precioVenta,
+          precioUnitario: precios[i] ?? precioConDescuento(p.precioVenta, p.descuentoPct),
         })),
       };
       if (idClienteVenta) body.idCliente = Number(idClienteVenta);
@@ -372,6 +420,7 @@ export default function VentaPage() {
       };
       setLastTicket(ticket);
       setCart([]);
+      setDescuentoTotalPct(0);
       setIdClienteVenta("");
       await load();
       await loadCaja();
@@ -699,25 +748,69 @@ export default function VentaPage() {
             <thead>
               <tr>
                 <th>Producto</th>
-                <th>Precio</th>
+                <th>Lista</th>
+                <th>Desc. %</th>
+                <th>Cobrar</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {cart.map((p, index) => (
-                <tr key={`${p.id}-${index}`}>
-                  <td>{p.descripcion}</td>
-                  <td>${p.precioVenta.toFixed(2)}</td>
-                  <td>
-                    <button type="button" className="btn btn-ghost" onClick={() => removeFromCart(index)}>
-                      Quitar
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {cart.map((p, index) => {
+                const precioLinea = preciosFinalesLineas[index] ?? precioConDescuento(p.precioVenta, p.descuentoPct);
+                return (
+                  <tr key={`${p.id}-${index}`}>
+                    <td>{p.descripcion}</td>
+                    <td>${p.precioVenta.toFixed(2)}</td>
+                    <td>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={p.descuentoPct}
+                        disabled={!cajaAbierta || saving}
+                        onChange={(e) => setDescuentoLinea(index, Number(e.target.value))}
+                        style={{ width: "4.5rem" }}
+                        aria-label={`Descuento % para ${p.descripcion}`}
+                      />
+                    </td>
+                    <td>
+                      <strong>${precioLinea.toFixed(2)}</strong>
+                    </td>
+                    <td>
+                      <button type="button" className="btn btn-ghost" onClick={() => removeFromCart(index)}>
+                        Quitar
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
+        {cart.length > 0 && (
+          <div className="filter-row" style={{ marginTop: "0.75rem", alignItems: "flex-end" }}>
+            <label>
+              Descuento sobre el total (%)
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={descuentoTotalPct}
+                disabled={!cajaAbierta || saving}
+                onChange={(e) => setDescuentoTotalPct(clampPct(Number(e.target.value)))}
+                style={{ width: "5rem" }}
+              />
+            </label>
+            {descuentoTotalPct > 0 || cart.some((l) => l.descuentoPct > 0) ? (
+              <p className="muted total-inline" style={{ margin: 0 }}>
+                Subtotal prendas: ${subtotalSinDescTotal.toFixed(2)}
+                {descuentoTotalPct > 0 ? ` · Desc. total ${descuentoTotalPct}%` : ""}
+              </p>
+            ) : null}
+          </div>
+        )}
         <p className="total">
           <strong>Total: ${total.toFixed(2)}</strong>
         </p>
