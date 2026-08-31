@@ -638,7 +638,7 @@ export default function VentaPage() {
       <div className="venta-grid">
       <section className="card">
         <h2>Prendas disponibles</h2>
-        <div className="form-grid" style={{ gridTemplateColumns: "1fr 180px 220px", gap: "0.5rem", marginBottom: "0.5rem" }}>
+        <div className="form-grid" style={{ gridTemplateColumns: "minmax(0, 1.4fr) minmax(100px, 0.6fr) minmax(140px, 1fr)", gap: "0.5rem", marginBottom: "0.5rem" }}>
           <label style={{ display: "flex", flexDirection: "column" }}>
             <span className="muted" style={{ fontSize: 12 }}>Buscar por descripción</span>
             <input

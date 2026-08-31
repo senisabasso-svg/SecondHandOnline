@@ -281,9 +281,15 @@ body {
 
 .venta-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(380px, 1.15fr);
   gap: 1.25rem;
   align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .venta-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 1fr);
+  }
 }
 
 @media (max-width: 960px) {
