@@ -142,6 +142,10 @@ export default function VivoSessionPage() {
   }
 
   async function mostrarPrenda(p: CatalogoPrenda) {
+    if (enPantalla && usuarioInput.trim()) {
+      const flushed = await flushUsuarioPendiente(enPantalla);
+      if (!flushed) return;
+    }
     const snapshot = vivo;
     const optimista: VivoItem = {
       id: -Date.now(),
@@ -216,13 +220,13 @@ export default function VivoSessionPage() {
     );
   }
 
-  async function agregarReserva(item: VivoItem) {
-    const texto = usuarioInput.trim();
-    if (!texto) return;
+  async function agregarReserva(item: VivoItem, textoOverride?: string): Promise<boolean> {
+    const texto = (textoOverride ?? usuarioInput).trim();
+    if (!texto) return false;
     const usuario = texto.startsWith("@") ? texto : `@${texto}`;
     if (item.reservas.some((r) => r.usuario.toLowerCase() === usuario.toLowerCase())) {
       setUsuarioInput("");
-      return;
+      return true;
     }
     const orden = item.reservas.length + 1;
     const optimista = {
@@ -236,12 +240,16 @@ export default function VivoSessionPage() {
     };
     patchVivoItem({ ...item, reservas: [...item.reservas, optimista] });
     setUsuarioInput("");
-    await queueOp(async () => {
-      const r = await vivoApi.addReserva(item.id, usuario);
+    try {
+      await vivoApi.addReserva(item.id, usuario);
       const refreshed = await vivoApi.get(vivoId);
       setVivo(refreshed);
-      return r;
-    });
+      return true;
+    } catch (e) {
+      showToast(String(e));
+      await load();
+      return false;
+    }
   }
 
   async function quitarReserva(item: VivoItem, reservaId: number) {
@@ -256,18 +264,42 @@ export default function VivoSessionPage() {
     );
   }
 
+  /** Guarda el @ del input si quedó sin Enter. */
+  async function flushUsuarioPendiente(item: VivoItem): Promise<VivoItem | null> {
+    const texto = usuarioInput.trim();
+    if (!texto) return item;
+    const ok = await agregarReserva(item, texto);
+    if (!ok) return null;
+    const refreshed = await vivoApi.get(vivoId);
+    setVivo(refreshed);
+    return refreshed.items?.find((it) => it.id === item.id) ?? null;
+  }
+
   async function marcarItem(estado: "vendida" | "liberada") {
     if (!enPantalla) return;
+    let item = enPantalla;
+
+    if (estado === "vendida") {
+      const flushed = await flushUsuarioPendiente(item);
+      if (!flushed) return;
+      item = flushed;
+      if (item.reservas.length === 0) {
+        showToast("Anotá un @ antes de marcar Vendida. Si nadie la quiere, usá Liberar.");
+        return;
+      }
+    }
+
     const snap = vivo;
+    const itemId = item.id;
     setVivo((prev) => {
       if (!prev?.items) return prev;
       return {
         ...prev,
-        items: prev.items.map((it) => (it.id === enPantalla.id ? { ...it, estado } : it)),
+        items: prev.items.map((it) => (it.id === itemId ? { ...it, estado } : it)),
       };
     });
     await queueOp(
-      () => vivoApi.patchItem(enPantalla.id, { estado }).then(() => load()),
+      () => vivoApi.patchItem(itemId, { estado }).then(() => load()),
       () => snap && setVivo(snap)
     );
   }
@@ -275,6 +307,13 @@ export default function VivoSessionPage() {
   async function cerrarVivo() {
     setCerrando(true);
     try {
+      if (enPantalla && usuarioInput.trim()) {
+        const flushed = await flushUsuarioPendiente(enPantalla);
+        if (!flushed) {
+          setCerrando(false);
+          return;
+        }
+      }
       await vivoApi.cerrar(vivoId);
       navigate(`/vivo/${vivoId}/cierre`);
     } catch (e) {
@@ -368,6 +407,7 @@ export default function VivoSessionPage() {
               }
             }}
           />
+          <p className="vivo-hint">Enter para anotar varios · o escribí el @ y tocá Vendida</p>
 
           <div className="vivo-reservas">
             {enPantalla.reservas.map((r) => (
@@ -381,7 +421,17 @@ export default function VivoSessionPage() {
           </div>
 
           <div className="vivo-actions">
-            <button type="button" className="btn btn-primary" onClick={() => marcarItem("vendida")}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              title={
+                enPantalla.reservas.length === 0 && !usuarioInput.trim()
+                  ? "Anotá un @ antes de marcar Vendida"
+                  : undefined
+              }
+              disabled={enPantalla.reservas.length === 0 && !usuarioInput.trim()}
+              onClick={() => marcarItem("vendida")}
+            >
               Vendida
             </button>
             <button type="button" className="btn btn-secondary" onClick={() => marcarItem("liberada")}>
