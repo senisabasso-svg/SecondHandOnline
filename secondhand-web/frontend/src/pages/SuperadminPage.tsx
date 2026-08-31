@@ -12,10 +12,22 @@ type SecondHandRow = {
   logoUrl: string | null;
 };
 
+const LOGO_MAX_BYTES = 4.5 * 1024 * 1024;
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("No se pudo leer la imagen."));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function SuperadminPage() {
   const { usuario, logout } = useAuth();
   const [tiendas, setTiendas] = useState<SecondHandRow[]>([]);
   const [nombreTienda, setNombreTienda] = useState("");
+  const [logoNuevaTienda, setLogoNuevaTienda] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [msgUser, setMsgUser] = useState<string | null>(null);
   const [msgBackup, setMsgBackup] = useState<string | null>(null);
@@ -30,6 +42,7 @@ export default function SuperadminPage() {
     vivoTiktokActivo: true,
   });
   const [saving, setSaving] = useState(false);
+  const [logoBusy, setLogoBusy] = useState(false);
   const [formUser, setFormUser] = useState({
     email: "",
     password: "",
@@ -50,6 +63,29 @@ export default function SuperadminPage() {
     load();
   }, [load]);
 
+  const cargarLogoDesdeArchivo = async (file: File | null, target: "create" | "edit") => {
+    setMsg(null);
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setMsg("Solo se permiten archivos de imagen (JPG, PNG, WebP, etc.).");
+      return;
+    }
+    if (file.size > LOGO_MAX_BYTES) {
+      setMsg("El logo supera ~4,5 MB. Elegí una imagen más liviana.");
+      return;
+    }
+    setLogoBusy(true);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      if (target === "create") setLogoNuevaTienda(dataUrl);
+      else setFormEdit((f) => ({ ...f, logoUrl: dataUrl }));
+    } catch (e) {
+      setMsg(String(e));
+    } finally {
+      setLogoBusy(false);
+    }
+  };
+
   const crearTienda = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
@@ -57,9 +93,13 @@ export default function SuperadminPage() {
     try {
       await api("/api/super/second-hands", {
         method: "POST",
-        body: JSON.stringify({ nombre: nombreTienda.trim() }),
+        body: JSON.stringify({
+          nombre: nombreTienda.trim(),
+          ...(logoNuevaTienda ? { logoUrl: logoNuevaTienda } : {}),
+        }),
       });
       setNombreTienda("");
+      setLogoNuevaTienda(null);
       await load();
       setMsg("Tienda creada. Use el idSecond mostrado para dar de alta usuarios.");
     } catch (e) {
@@ -229,8 +269,41 @@ export default function SuperadminPage() {
                 required
               />
             </label>
+            <label>
+              Logo (opcional)
+              <input
+                type="file"
+                accept="image/*"
+                disabled={logoBusy}
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  void cargarLogoDesdeArchivo(f, "create");
+                }}
+              />
+            </label>
+            {logoNuevaTienda ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <img
+                  src={logoNuevaTienda}
+                  alt="Vista previa logo"
+                  style={{ width: 64, height: 64, objectFit: "cover", borderRadius: "50%", border: "1px solid #ddd" }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setLogoNuevaTienda(null)}
+                >
+                  Quitar logo
+                </button>
+              </div>
+            ) : (
+              <p className="muted" style={{ margin: 0, fontSize: "0.85rem" }}>
+                JPG/PNG/WebP, máx. ~4,5 MB. También podés cargarlo después al editar la tienda.
+              </p>
+            )}
             <div className="form-actions">
-              <button type="submit" className="btn btn-primary">
+              <button type="submit" className="btn btn-primary" disabled={logoBusy}>
                 Dar de alta tienda
               </button>
             </div>
@@ -273,13 +346,49 @@ export default function SuperadminPage() {
                               />
                             </label>
                             <label>
-                              Logo URL (ruta en /public, ej: /romilogo.jpeg)
+                              Subir logo desde archivo
                               <input
-                                value={formEdit.logoUrl}
-                                onChange={(e) => setFormEdit((f) => ({ ...f, logoUrl: e.target.value }))}
-                                placeholder="/logos/tienda.png"
+                                type="file"
+                                accept="image/*"
+                                disabled={logoBusy || saving}
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0] ?? null;
+                                  e.target.value = "";
+                                  void cargarLogoDesdeArchivo(f, "edit");
+                                }}
                               />
                             </label>
+                            <p className="muted" style={{ margin: 0, fontSize: "0.85rem" }}>
+                              JPG/PNG/WebP, máx. ~4,5 MB. Reemplaza el logo actual al guardar.
+                            </p>
+                            {formEdit.logoUrl ? (
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                                <img
+                                  src={formEdit.logoUrl}
+                                  alt="Logo"
+                                  style={{
+                                    width: 72,
+                                    height: 72,
+                                    objectFit: "cover",
+                                    borderRadius: "50%",
+                                    border: "1px solid #ddd",
+                                  }}
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = "none";
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost"
+                                  disabled={saving}
+                                  onClick={() => setFormEdit((f) => ({ ...f, logoUrl: "" }))}
+                                >
+                                  Quitar logo
+                                </button>
+                              </div>
+                            ) : (
+                              <p className="muted" style={{ margin: 0 }}>Sin logo</p>
+                            )}
                             <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                               <input
                                 type="checkbox"
@@ -304,23 +413,8 @@ export default function SuperadminPage() {
                               />
                               Tienda activa
                             </label>
-                            {formEdit.logoUrl && (
-                              <div style={{ marginTop: "0.5rem" }}>
-                                <strong>Vista previa:</strong>
-                                <div style={{ marginTop: "0.25rem" }}>
-                                  <img
-                                    src={formEdit.logoUrl}
-                                    alt="Logo"
-                                    style={{ maxWidth: 80, maxHeight: 80, objectFit: "contain", border: "1px solid #ddd", borderRadius: 4 }}
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).style.display = "none";
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                            )}
                             <div className="form-actions" style={{ marginTop: "0.5rem" }}>
-                              <button type="submit" className="btn btn-primary" disabled={saving}>
+                              <button type="submit" className="btn btn-primary" disabled={saving || logoBusy}>
                                 {saving ? "Guardando..." : "Guardar"}
                               </button>
                               <button type="button" className="btn btn-secondary" onClick={cancelarEdicion} disabled={saving}>

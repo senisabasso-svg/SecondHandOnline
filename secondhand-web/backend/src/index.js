@@ -288,11 +288,35 @@ app.get("/api/super/second-hands", authOptional, requireAuth, requireSuperadmin,
   }
 });
 
+function normalizeLogoUrl(logoUrl) {
+  if (logoUrl === undefined) return undefined;
+  if (logoUrl == null || logoUrl === "") return null;
+  if (typeof logoUrl !== "string") return { error: "logoUrl inválido." };
+  const s = logoUrl.trim();
+  if (!s) return null;
+  if (s.startsWith("data:image/")) {
+    if (s.length > 6_500_000) return { error: "El logo es demasiado grande (máx. ~5 MB)." };
+    return s;
+  }
+  if (s.startsWith("/")) return s;
+  return { error: "El logo debe ser un archivo de imagen o una ruta que empiece con /." };
+}
+
 app.post("/api/super/second-hands", authOptional, requireAuth, requireSuperadmin, async (req, res) => {
   try {
-    const { nombre } = req.body;
+    const { nombre, logoUrl } = req.body;
     if (!nombre?.trim()) return res.status(400).json({ error: "El nombre de la tienda es obligatorio." });
-    const row = await prisma.secondHand.create({ data: { nombre: nombre.trim(), activo: true } });
+    const logoNorm = normalizeLogoUrl(logoUrl);
+    if (logoNorm && typeof logoNorm === "object" && logoNorm.error) {
+      return res.status(400).json({ error: logoNorm.error });
+    }
+    const row = await prisma.secondHand.create({
+      data: {
+        nombre: nombre.trim(),
+        activo: true,
+        ...(logoNorm !== undefined ? { logoUrl: logoNorm } : {}),
+      },
+    });
     res.status(201).json(row);
   } catch (e) {
     console.error(e);
@@ -307,7 +331,13 @@ app.put("/api/super/second-hands/:id", authOptional, requireAuth, requireSuperad
     const updateData = {};
     if (nombre !== undefined) updateData.nombre = nombre?.trim() || null;
     if (activo !== undefined) updateData.activo = Boolean(activo);
-    if (logoUrl !== undefined) updateData.logoUrl = logoUrl?.trim() || null;
+    if (logoUrl !== undefined) {
+      const logoNorm = normalizeLogoUrl(logoUrl);
+      if (logoNorm && typeof logoNorm === "object" && logoNorm.error) {
+        return res.status(400).json({ error: logoNorm.error });
+      }
+      updateData.logoUrl = logoNorm;
+    }
     if (webVistasActivo !== undefined) updateData.webVistasActivo = Boolean(webVistasActivo);
     if (vivoTiktokActivo !== undefined) updateData.vivoTiktokActivo = Boolean(vivoTiktokActivo);
     const row = await prisma.secondHand.update({ where: { id }, data: updateData });
