@@ -8,6 +8,7 @@ type SecondHandRow = {
   activo: boolean;
   webVistasActivo: boolean;
   vivoTiktokActivo: boolean;
+  devolucionesActivo: boolean;
   createdAt: string;
   logoUrl: string | null;
 };
@@ -40,6 +41,7 @@ export default function SuperadminPage() {
     logoUrl: "",
     webVistasActivo: true,
     vivoTiktokActivo: true,
+    devolucionesActivo: true,
   });
   const [saving, setSaving] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
@@ -115,12 +117,20 @@ export default function SuperadminPage() {
       logoUrl: t.logoUrl || "",
       webVistasActivo: t.webVistasActivo,
       vivoTiktokActivo: t.vivoTiktokActivo,
+      devolucionesActivo: t.devolucionesActivo,
     });
   };
 
   const cancelarEdicion = () => {
     setEditingId(null);
-    setFormEdit({ nombre: "", activo: true, logoUrl: "", webVistasActivo: true, vivoTiktokActivo: true });
+    setFormEdit({
+      nombre: "",
+      activo: true,
+      logoUrl: "",
+      webVistasActivo: true,
+      vivoTiktokActivo: true,
+      devolucionesActivo: true,
+    });
   };
 
   const guardarEdicion = async (e: React.FormEvent) => {
@@ -137,6 +147,7 @@ export default function SuperadminPage() {
           logoUrl: formEdit.logoUrl.trim() || null,
           webVistasActivo: formEdit.webVistasActivo,
           vivoTiktokActivo: formEdit.vivoTiktokActivo,
+          devolucionesActivo: formEdit.devolucionesActivo,
         }),
       });
       await load();
@@ -323,6 +334,7 @@ export default function SuperadminPage() {
                   <th>Activa</th>
                   <th>Web vistas</th>
                   <th>Vivo TikTok</th>
+                  <th>Devoluciones</th>
                   <th>Alta</th>
                   <th></th>
                 </tr>
@@ -335,7 +347,7 @@ export default function SuperadminPage() {
                         <td>
                           <strong>{t.id}</strong>
                         </td>
-                        <td colSpan={7}>
+                        <td colSpan={8}>
                           <form onSubmit={guardarEdicion} className="form-grid" style={{ maxWidth: 600, margin: "0.5rem 0" }}>
                             <label>
                               Nombre
@@ -408,6 +420,14 @@ export default function SuperadminPage() {
                             <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                               <input
                                 type="checkbox"
+                                checked={formEdit.devolucionesActivo}
+                                onChange={(e) => setFormEdit((f) => ({ ...f, devolucionesActivo: e.target.checked }))}
+                              />
+                              Devoluciones habilitado
+                            </label>
+                            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <input
+                                type="checkbox"
                                 checked={formEdit.activo}
                                 onChange={(e) => setFormEdit((f) => ({ ...f, activo: e.target.checked }))}
                               />
@@ -447,6 +467,7 @@ export default function SuperadminPage() {
                         <td>{t.activo ? "Sí" : "No"}</td>
                         <td>{t.webVistasActivo ? "Sí" : "No"}</td>
                         <td>{t.vivoTiktokActivo ? "Sí" : "No"}</td>
+                        <td>{t.devolucionesActivo ? "Sí" : "No"}</td>
                         <td>{new Date(t.createdAt).toLocaleString("es")}</td>
                         <td>
                           <button type="button" className="btn btn-ghost" onClick={() => iniciarEdicion(t)}>

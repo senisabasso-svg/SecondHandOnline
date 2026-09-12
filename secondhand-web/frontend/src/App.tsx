@@ -13,6 +13,7 @@ import ProveedorPortalPage from "./pages/ProveedorPortalPage";
 import ClientesPage from "./pages/ClientesPage";
 import CuentasCorrientesPage from "./pages/CuentasCorrientesPage";
 import WebVistasPage from "./pages/WebVistasPage";
+import DevolucionesPage from "./pages/DevolucionesPage";
 
 const VivoListPage = lazy(() => import("./pages/vivo/VivoListPage"));
 const VivoSessionPage = lazy(() => import("./pages/vivo/VivoSessionPage"));
@@ -24,6 +25,7 @@ type TiendaInfo = {
   logoUrl?: string | null;
   webVistasActivo: boolean;
   vivoTiktokActivo: boolean;
+  devolucionesActivo: boolean;
 };
 
 function TenantLayout() {
@@ -66,6 +68,11 @@ function TenantLayout() {
           <NavLink to="/cuentas-corrientes" className={({ isActive }) => (isActive ? "active" : "")}>
             Cuentas corrientes
           </NavLink>
+          {tienda?.devolucionesActivo ? (
+            <NavLink to="/devoluciones" className={({ isActive }) => (isActive ? "active" : "")}>
+              Devoluciones
+            </NavLink>
+          ) : null}
           <NavLink to="/informes" className={({ isActive }) => (isActive ? "active" : "")}>
             Informes
           </NavLink>
@@ -162,10 +169,21 @@ function SuperadminRoute() {
   return <SuperadminPage />;
 }
 
-function RequireModulo({ modulo, children }: { modulo: "webVistas" | "vivoTiktok"; children: ReactNode }) {
+function RequireModulo({
+  modulo,
+  children,
+}: {
+  modulo: "webVistas" | "vivoTiktok" | "devoluciones";
+  children: ReactNode;
+}) {
   const { tienda } = useOutletContext<{ tienda: TiendaInfo | null }>();
   if (!tienda) return <p className="muted">Cargando...</p>;
-  const ok = modulo === "webVistas" ? tienda.webVistasActivo : tienda.vivoTiktokActivo;
+  const ok =
+    modulo === "webVistas"
+      ? tienda.webVistasActivo
+      : modulo === "vivoTiktok"
+        ? tienda.vivoTiktokActivo
+        : tienda.devolucionesActivo;
   if (!ok) {
     return (
       <div className="page card">
@@ -195,6 +213,14 @@ export default function App() {
           <Route path="/proveedores" element={<ProveedoresPage />} />
           <Route path="/clientes" element={<ClientesPage />} />
           <Route path="/cuentas-corrientes" element={<CuentasCorrientesPage />} />
+          <Route
+            path="/devoluciones"
+            element={
+              <RequireModulo modulo="devoluciones">
+                <DevolucionesPage />
+              </RequireModulo>
+            }
+          />
           <Route path="/informes" element={<InformesPage />} />
           <Route
             path="/web-vistas"

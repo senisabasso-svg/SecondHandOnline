@@ -8,13 +8,14 @@ datasource db {
 }
 
 model SecondHand {
-  id               Int      @id @default(autoincrement())
-  nombre           String
-  activo           Boolean  @default(true)
-  webVistasActivo  Boolean  @default(true) @map("web_vistas_activo")
-  vivoTiktokActivo Boolean  @default(true) @map("vivo_tiktok_activo")
-  createdAt        DateTime @default(now()) @map("created_at")
-  logoUrl          String?  @map("logo_url")
+  id                 Int      @id @default(autoincrement())
+  nombre             String
+  activo             Boolean  @default(true)
+  webVistasActivo    Boolean  @default(true) @map("web_vistas_activo")
+  vivoTiktokActivo   Boolean  @default(true) @map("vivo_tiktok_activo")
+  devolucionesActivo Boolean  @default(true) @map("devoluciones_activo")
+  createdAt          DateTime @default(now()) @map("created_at")
+  logoUrl            String?  @map("logo_url")
 
   usuarios    Usuario[]
   proveedores Proveedor[]
@@ -29,6 +30,8 @@ model SecondHand {
   cuentaCorrienteMovimientos CuentaCorrienteMovimiento[]
   webVistaPrendas WebVistaPrenda[]
   vivos           Vivo[]
+  devoluciones    Devolucion[]
+  devolucionItems DevolucionItem[]
 
   @@map("second_hands")
 }
@@ -78,6 +81,7 @@ model Producto {
   proveedor  Proveedor  @relation(fields: [idProveedor], references: [id])
   ventaItems VentaItem[]
   vivoItems  VivoItem[]
+  devolucionItems DevolucionItem[]
 
   @@index([idSecond])
   @@map("productos")
@@ -129,6 +133,7 @@ model Venta {
   cliente    Cliente? @relation(fields: [idCliente], references: [id], onDelete: SetNull)
   items      VentaItem[]
   cuentaCorrienteMovimiento CuentaCorrienteMovimiento?
+  devoluciones Devolucion[]
 
   @@index([idSecond])
   @@index([idCaja])
@@ -146,6 +151,7 @@ model VentaItem {
   secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
   venta      Venta      @relation(fields: [idVenta], references: [id], onDelete: Cascade)
   producto   Producto   @relation(fields: [idProducto], references: [id])
+  devolucionItem DevolucionItem?
 
   @@index([idSecond])
   @@map("venta_items")
@@ -285,4 +291,44 @@ model VivoReserva {
 
   @@index([vivoItemId])
   @@map("vivo_reservas")
+}
+
+model Devolucion {
+  id              Int      @id @default(autoincrement())
+  idSecond        Int      @map("id_second")
+  idVenta         Int      @map("id_venta")
+  idCaja          Int?     @map("id_caja")
+  fecha           DateTime @default(now())
+  monto           Float
+  medioReintegro  String   @map("medio_reintegro")
+  motivo          String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  secondHand SecondHand      @relation(fields: [idSecond], references: [id], onDelete: Cascade)
+  venta      Venta           @relation(fields: [idVenta], references: [id], onDelete: Restrict)
+  items      DevolucionItem[]
+
+  @@index([idSecond])
+  @@index([idVenta])
+  @@index([idSecond, fecha])
+  @@map("devoluciones")
+}
+
+model DevolucionItem {
+  id             Int   @id @default(autoincrement())
+  idSecond       Int   @map("id_second")
+  idDevolucion   Int   @map("id_devolucion")
+  idVentaItem    Int   @unique @map("id_venta_item")
+  idProducto     Int   @map("id_producto")
+  precioUnitario Float @map("precio_unitario")
+
+  secondHand SecondHand @relation(fields: [idSecond], references: [id], onDelete: Cascade)
+  devolucion Devolucion @relation(fields: [idDevolucion], references: [id], onDelete: Cascade)
+  ventaItem  VentaItem  @relation(fields: [idVentaItem], references: [id], onDelete: Restrict)
+  producto   Producto   @relation(fields: [idProducto], references: [id], onDelete: Restrict)
+
+  @@index([idSecond])
+  @@index([idDevolucion])
+  @@index([idProducto])
+  @@map("devolucion_items")
 }
