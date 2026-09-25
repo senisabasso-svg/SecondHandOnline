@@ -1,5 +1,5 @@
 import { Routes, Route, NavLink, Navigate, Outlet, useOutletContext } from "react-router-dom";
-import { Suspense, lazy, useEffect, useState, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "./context/AuthContext";
 import { api } from "./api";
 import VentaPage from "./pages/VentaPage";
@@ -31,32 +31,45 @@ type TiendaInfo = {
 
 const SOPORTE_WHATSAPP = "59892331019";
 const SOPORTE_MSG = "Hola, necesito actualizar el pago de mi empresa en SecondHand.";
+const AVISO_PAGO_INTERVALO_MS = 10_000;
 
 function TenantLayout() {
   const { usuario, logout } = useAuth();
   const [tienda, setTienda] = useState<TiendaInfo | null>(null);
   const [mostrarPendientePago, setMostrarPendientePago] = useState(false);
+  const avisoTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (!usuario?.idSecond) return;
     api<TiendaInfo>("/api/tienda")
-      .then((t) => {
-        setTienda(t);
-        if (t.pendientePago) {
-          const key = `sh_pago_aviso_${t.id}`;
-          if (sessionStorage.getItem(key) !== "1") {
-            setMostrarPendientePago(true);
-          }
-        } else {
-          setMostrarPendientePago(false);
-        }
-      })
+      .then(setTienda)
       .catch(() => setTienda(null));
   }, [usuario?.idSecond]);
 
+  useEffect(() => {
+    if (avisoTimer.current) {
+      window.clearTimeout(avisoTimer.current);
+      avisoTimer.current = null;
+    }
+    if (!tienda?.pendientePago) {
+      setMostrarPendientePago(false);
+      return;
+    }
+    setMostrarPendientePago(true);
+    return () => {
+      if (avisoTimer.current) {
+        window.clearTimeout(avisoTimer.current);
+        avisoTimer.current = null;
+      }
+    };
+  }, [tienda?.pendientePago, tienda?.id]);
+
   const continuarUsando = () => {
-    if (tienda) sessionStorage.setItem(`sh_pago_aviso_${tienda.id}`, "1");
     setMostrarPendientePago(false);
+    if (avisoTimer.current) window.clearTimeout(avisoTimer.current);
+    avisoTimer.current = window.setTimeout(() => {
+      setMostrarPendientePago(true);
+    }, AVISO_PAGO_INTERVALO_MS);
   };
 
   const contactarWhatsApp = () => {
