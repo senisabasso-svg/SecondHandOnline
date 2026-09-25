@@ -9,6 +9,7 @@ type SecondHandRow = {
   webVistasActivo: boolean;
   vivoTiktokActivo: boolean;
   devolucionesActivo: boolean;
+  pendientePago: boolean;
   createdAt: string;
   logoUrl: string | null;
 };
@@ -42,6 +43,7 @@ export default function SuperadminPage() {
     webVistasActivo: true,
     vivoTiktokActivo: true,
     devolucionesActivo: true,
+    pendientePago: false,
   });
   const [saving, setSaving] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
@@ -118,6 +120,7 @@ export default function SuperadminPage() {
       webVistasActivo: t.webVistasActivo,
       vivoTiktokActivo: t.vivoTiktokActivo,
       devolucionesActivo: t.devolucionesActivo,
+      pendientePago: t.pendientePago,
     });
   };
 
@@ -130,6 +133,7 @@ export default function SuperadminPage() {
       webVistasActivo: true,
       vivoTiktokActivo: true,
       devolucionesActivo: true,
+      pendientePago: false,
     });
   };
 
@@ -148,6 +152,7 @@ export default function SuperadminPage() {
           webVistasActivo: formEdit.webVistasActivo,
           vivoTiktokActivo: formEdit.vivoTiktokActivo,
           devolucionesActivo: formEdit.devolucionesActivo,
+          pendientePago: formEdit.pendientePago,
         }),
       });
       await load();
@@ -335,6 +340,7 @@ export default function SuperadminPage() {
                   <th>Web vistas</th>
                   <th>Vivo TikTok</th>
                   <th>Devoluciones</th>
+                  <th>Pend. pago</th>
                   <th>Alta</th>
                   <th></th>
                 </tr>
@@ -347,7 +353,7 @@ export default function SuperadminPage() {
                         <td>
                           <strong>{t.id}</strong>
                         </td>
-                        <td colSpan={8}>
+                        <td colSpan={9}>
                           <form onSubmit={guardarEdicion} className="form-grid" style={{ maxWidth: 600, margin: "0.5rem 0" }}>
                             <label>
                               Nombre
@@ -428,6 +434,14 @@ export default function SuperadminPage() {
                             <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                               <input
                                 type="checkbox"
+                                checked={formEdit.pendientePago}
+                                onChange={(e) => setFormEdit((f) => ({ ...f, pendientePago: e.target.checked }))}
+                              />
+                              Pendiente de pago
+                            </label>
+                            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <input
+                                type="checkbox"
                                 checked={formEdit.activo}
                                 onChange={(e) => setFormEdit((f) => ({ ...f, activo: e.target.checked }))}
                               />
@@ -468,6 +482,7 @@ export default function SuperadminPage() {
                         <td>{t.webVistasActivo ? "Sí" : "No"}</td>
                         <td>{t.vivoTiktokActivo ? "Sí" : "No"}</td>
                         <td>{t.devolucionesActivo ? "Sí" : "No"}</td>
+                        <td>{t.pendientePago ? "Sí" : "No"}</td>
                         <td>{new Date(t.createdAt).toLocaleString("es")}</td>
                         <td>
                           <button type="button" className="btn btn-ghost" onClick={() => iniciarEdicion(t)}>

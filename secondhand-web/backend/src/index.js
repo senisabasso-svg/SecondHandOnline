@@ -73,7 +73,7 @@ app.get("/api/tienda", authOptional, requireAuth, requireTenant, async (req, res
   try {
     const sh = await prisma.secondHand.findUnique({
       where: { id: req.user.idSecond },
-      select: { id: true, nombre: true, logoUrl: true, webVistasActivo: true, vivoTiktokActivo: true, devolucionesActivo: true },
+      select: { id: true, nombre: true, logoUrl: true, webVistasActivo: true, vivoTiktokActivo: true, devolucionesActivo: true, pendientePago: true },
     });
     if (!sh) return res.status(404).json({ error: "Tienda no encontrada." });
     res.json(sh);
@@ -328,7 +328,7 @@ app.post("/api/super/second-hands", authOptional, requireAuth, requireSuperadmin
 app.put("/api/super/second-hands/:id", authOptional, requireAuth, requireSuperadmin, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { nombre, activo, logoUrl, webVistasActivo, vivoTiktokActivo, devolucionesActivo } = req.body;
+    const { nombre, activo, logoUrl, webVistasActivo, vivoTiktokActivo, devolucionesActivo, pendientePago } = req.body;
     const updateData = {};
     if (nombre !== undefined) updateData.nombre = nombre?.trim() || null;
     if (activo !== undefined) updateData.activo = Boolean(activo);
@@ -342,6 +342,7 @@ app.put("/api/super/second-hands/:id", authOptional, requireAuth, requireSuperad
     if (webVistasActivo !== undefined) updateData.webVistasActivo = Boolean(webVistasActivo);
     if (vivoTiktokActivo !== undefined) updateData.vivoTiktokActivo = Boolean(vivoTiktokActivo);
     if (devolucionesActivo !== undefined) updateData.devolucionesActivo = Boolean(devolucionesActivo);
+    if (pendientePago !== undefined) updateData.pendientePago = Boolean(pendientePago);
     const row = await prisma.secondHand.update({ where: { id }, data: updateData });
     res.json(row);
   } catch (e) {
@@ -384,7 +385,7 @@ const BACKUP_SPECS = [
     key: "secondHands",
     model: "secondHand",
     table: "second_hands",
-    fields: ["id", "nombre", "activo", "webVistasActivo", "vivoTiktokActivo", "devolucionesActivo", "createdAt", "logoUrl"],
+    fields: ["id", "nombre", "activo", "webVistasActivo", "vivoTiktokActivo", "devolucionesActivo", "pendientePago", "createdAt", "logoUrl"],
   },
   {
     key: "usuarios",

@@ -14,6 +14,7 @@ model SecondHand {
   webVistasActivo    Boolean  @default(true) @map("web_vistas_activo")
   vivoTiktokActivo   Boolean  @default(true) @map("vivo_tiktok_activo")
   devolucionesActivo Boolean  @default(true) @map("devoluciones_activo")
+  pendientePago      Boolean  @default(false) @map("pendiente_pago")
   createdAt          DateTime @default(now()) @map("created_at")
   logoUrl            String?  @map("logo_url")
 

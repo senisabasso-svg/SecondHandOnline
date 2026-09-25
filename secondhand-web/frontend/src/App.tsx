@@ -26,18 +26,43 @@ type TiendaInfo = {
   webVistasActivo: boolean;
   vivoTiktokActivo: boolean;
   devolucionesActivo: boolean;
+  pendientePago: boolean;
 };
+
+const SOPORTE_WHATSAPP = "59892331019";
+const SOPORTE_MSG = "Hola, necesito actualizar el pago de mi empresa en SecondHand.";
 
 function TenantLayout() {
   const { usuario, logout } = useAuth();
   const [tienda, setTienda] = useState<TiendaInfo | null>(null);
+  const [mostrarPendientePago, setMostrarPendientePago] = useState(false);
 
   useEffect(() => {
     if (!usuario?.idSecond) return;
     api<TiendaInfo>("/api/tienda")
-      .then(setTienda)
+      .then((t) => {
+        setTienda(t);
+        if (t.pendientePago) {
+          const key = `sh_pago_aviso_${t.id}`;
+          if (sessionStorage.getItem(key) !== "1") {
+            setMostrarPendientePago(true);
+          }
+        } else {
+          setMostrarPendientePago(false);
+        }
+      })
       .catch(() => setTienda(null));
   }, [usuario?.idSecond]);
+
+  const continuarUsando = () => {
+    if (tienda) sessionStorage.setItem(`sh_pago_aviso_${tienda.id}`, "1");
+    setMostrarPendientePago(false);
+  };
+
+  const contactarWhatsApp = () => {
+    const url = `https://wa.me/${SOPORTE_WHATSAPP}?text=${encodeURIComponent(SOPORTE_MSG)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <div className="app">
@@ -100,6 +125,25 @@ function TenantLayout() {
       <main className="main">
         <Outlet context={{ tienda }} />
       </main>
+
+      {mostrarPendientePago && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="pago-pendiente-titulo">
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h3 id="pago-pendiente-titulo">Aviso de pago</h3>
+            <p>
+              Contacte a soporte <strong>092331019</strong>, empresa pendiente de actualizar pago.
+            </p>
+            <div className="modal-pago-actions" style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "1rem" }}>
+              <button type="button" className="btn btn-primary" onClick={continuarUsando}>
+                Continuar usando
+              </button>
+              <button type="button" className="btn btn-accent" onClick={contactarWhatsApp}>
+                Contactar para actualizar pago
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
